@@ -180,6 +180,32 @@ def ext_socios(t):
     return [s for s in socios if len(s)>8 and s not in excl][:8]
 
 def ext_endereco(t):
+    """Monta endereço completo — prioriza campos estruturados do cartão CNPJ."""
+    lograd = re.search(r'LOGRADOURO\s*[:\-]?\s*([^\n]+)', t, re.I)
+    numero = re.search(r'N[ÚU]MERO\s*[:\-]?\s*([^\n]+)', t, re.I)
+    compl  = re.search(r'COMPLEMENTO\s*[:\-]?\s*([^\n]+)', t, re.I)
+    bairro = re.search(r'BAIRRO(?:/DISTRITO)?\s*[:\-]?\s*([^\n]+)', t, re.I)
+    munic  = re.search(r'MUNIC[IÍ]PIO\s*[:\-]?\s*([^\n]+)', t, re.I)
+    uf     = re.search(r'\bUF\s*[:\-]?\s*([A-Z]{2})\b', t)
+    cep    = re.search(r'CEP\s*[:\-]?\s*([\d\.\-]+)', t, re.I)
+
+    if lograd:
+        partes = []
+        rua = lograd.group(1).strip()
+        if numero and re.sub(r'\s','',numero.group(1)) not in ('','S/N','SN','0'):
+            rua = rua + ', ' + numero.group(1).strip()
+        partes.append(rua)
+        if compl and compl.group(1).strip():
+            partes.append(compl.group(1).strip())
+        if bairro: partes.append(bairro.group(1).strip())
+        cidade = ''
+        if munic: cidade = munic.group(1).strip()
+        if uf:    cidade = (cidade + '/' + uf.group(1)) if cidade else uf.group(1)
+        if cidade: partes.append(cidade)
+        if cep:   partes.append('CEP ' + cep.group(1).strip())
+        return ' — '.join(p for p in partes if p)
+
+    # Fallback: padrões genéricos
     return first(
         r'(?:sede|endere[çc]o|domicílio|situada?)\s+(?:na|em|[àa]|no)?\s*([A-ZÁÉÍÓÚ][^\n]{15,150}(?:nº|n\.|n[úu]mero|\d+)[^\n]{0,80})',
         r'(?:Rua|Av\.|Avenida|Alameda|Travessa|Rod\.|Rodovia|Pra[çc]a)\s+[^\n]{10,120}',
@@ -189,6 +215,9 @@ def ext_endereco(t):
     )
 
 def ext_data(t):
+    # Campo explícito do cartão CNPJ
+    m = re.search(r'DATA\s+DE\s+ABERTURA\s*[:\-]?\s*(\d{1,2}[\/\-\.]\d{1,2}[\/\-\.]\d{4})', t, re.I)
+    if m: return m.group(1).strip()
     return first(
         r'(?:constitu[iíi]da?|fundada?|celebrado?)\s+(?:em|no dia|na data de)?\s*(\d{1,2}[\s\/\-\.]+(?:de\s+)?(?:janeiro|fevereiro|março|abril|maio|junho|julho|agosto|setembro|outubro|novembro|dezembro|\d{1,2})[\s\/\-\.]+(?:de\s+)?\d{4})',
         r'[Dd]ata\s+(?:de\s+)?(?:abertura|constitu[iíi][çc][aã]o)\s*[:\-]?\s*(\d{1,2}[\s\/\-\.]\d{1,2}[\s\/\-\.]\d{4})',
@@ -221,6 +250,21 @@ def inferir_porte(t, cap):
     if 'eireli' in tl: return 'ME'
     return ''
 
+def ext_cnaes(t):
+    """Extrai CNAE principal e secundários do cartão CNPJ."""
+    cnaes = []
+    # CNAE fiscal principal
+    m = re.search(r'CNAE\s+FISCAL\s*[:\-]?\s*([\d\-\/]+\s*[-–]\s*[^\n]+)', t, re.I)
+    if m:
+        cnaes.append('Principal: ' + lim(m.group(1)))
+    # Atividades secundárias
+    for cod, desc in re.findall(r'(\d{4}[-]\d/\d{2})\s*[-–]\s*([^\n]+)', t):
+        entrada = f'{cod} - {lim(desc)}'
+        if not any(cod in c for c in cnaes):
+            cnaes.append(entrada)
+    return cnaes
+
+
 def ext_email(t):
     emails = re.findall(r'[\w\.\-\+]+@[\w\-]+\.[\w\.\-]+', t)
     for e in emails:
@@ -228,6 +272,12 @@ def ext_email(t):
     return emails[0] if emails else ""
 
 def ext_telefone(t):
+    # Prioriza campo TELEFONE explícito do cartão CNPJ
+    m = re.search(r'TELEFONE\s*[:\-]?\s*([\(\d][\d\s\-\.\(\)]+\d)', t, re.I)
+    if m:
+        tel = m.group(1).strip()
+        if len(re.sub(r'\D','',tel)) >= 8:
+            return tel
     for m in re.findall(r'(?:\(?\d{2}\)?\s?)?(?:9\s?)?\d{4}[\s\-]?\d{4}', t):
         if len(re.sub(r'\D','',m)) >= 8: return m.strip()
     return ""
@@ -277,6 +327,8 @@ def extrair_dados(pdf: str) -> dict:
     razao   = ext_razao(texto)
     capital = ext_capital(texto)
     socios  = ext_socios(texto)
+    cnaes   = ext_cnaes(texto)
+    cnaes   = ext_cnaes(texto)
 
     # Tenta extrair campos do formulário S&C (preenchido)
     nome_grupo      = ext_campo(texto, "Nome do Grupo")
@@ -394,6 +446,8 @@ def extrair_dados(pdf: str) -> dict:
         "produtorRural":      prod_rural,
         "softwares":          softwares,
         "processosInternos":  processos_int,
+        # CNAEs
+        "cnaes":              cnaes,
         # Metadados
         "todosSocios":        socios,
         "_metodo":            metodo,

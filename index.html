@@ -307,6 +307,7 @@ input.auto,select.auto,textarea.auto{background:var(--green-bg);border-color:var
     </div>
     <div class="grid g1"><div class="fg"><div class="fl">Atividade principal <span class="badge b-auto" id="b-atv" style="display:none">Auto</span></div><input id="atividadePrincipal" placeholder="Ex: Comércio varejista de madeira e artefatos"></div></div>
     <div class="grid g1"><div class="fg"><div class="fl">Endereço <span class="badge b-auto" id="b-end" style="display:none">Auto</span></div><input id="localizacao" placeholder="Rua, número — Bairro, Cidade/UF"></div></div>
+    <div class="grid g1"><div class="fg"><div class="fl">CNAEs / atividades <span class="badge b-auto" id="b-cnaes" style="display:none">Auto</span></div><textarea id="cnaes" placeholder="Atividades econômicas (principal e secundárias) — extraídas do cartão CNPJ" style="min-height:80px"></textarea></div></div>
     <div class="grid g2">
       <div class="fg"><div class="fl">Qtd. funcionários <span class="badge b-man">Manual</span></div><input type="number" id="qtdFunc" placeholder="0"></div>
       <div class="fg"><div class="fl">Qtd. CNPJs / filiais <span class="badge b-auto" id="b-qcnpj" style="display:none">Auto</span><span class="badge b-man" id="bm-qcnpj">Manual</span></div><input id="qtdCNPJ" placeholder="0"></div>
@@ -597,6 +598,7 @@ function fill(d){
   set('capitalSocial',d.capitalSocial,'b-cap');
   set('atividadePrincipal',d.atividadePrincipal,'b-atv');
   set('localizacao',d.localizacao,'b-end');
+  if(d.cnaes&&d.cnaes.length){const el=document.getElementById('cnaes');if(el&&!el.value){el.value=d.cnaes.join('\n');el.classList.add('auto');const b=document.getElementById('b-cnaes');if(b)b.style.display='inline';}}
   set('qtdCNPJ',d.qtdCNPJ,'b-qcnpj');
   if(d.qtdCNPJ)document.getElementById('bm-qcnpj').style.display='none';
   set('obsGerais',d.obsGerais,'b-obs');
@@ -649,7 +651,7 @@ function sec(title,cols,rows){
 function gerarResumo(){
   /* ── versão tela ── */
   const secs=[
-    {t:'Dados do grupo',c:[['Nome do grupo',g('nomeGrupo')],['Razão social',g('razaoSocial')],['CNPJ',g('cnpj')],['Data de abertura',g('dataConst')],['Porte',g('porte')],['Capital social',g('capitalSocial')],['Atividade principal',g('atividadePrincipal')],['Localização',g('localizacao')],['Funcionários',g('qtdFunc')],['CNPJs/filiais',g('qtdCNPJ')],['Observações',g('obsGerais')]]},
+    {t:'Dados do grupo',c:[['Nome do grupo',g('nomeGrupo')],['Razão social',g('razaoSocial')],['CNPJ',g('cnpj')],['Data de abertura',g('dataConst')],['Porte',g('porte')],['Capital social',g('capitalSocial')],['Atividade principal',g('atividadePrincipal')],['CNAEs',g('cnaes')],['Localização',g('localizacao')],['Funcionários',g('qtdFunc')],['CNPJs/filiais',g('qtdCNPJ')],['Observações',g('obsGerais')]]},
     {t:'Tributário e contrato',c:[['Regime',g('regime')],['Tipo de serviço',g('tipoServico')],['Honorário',g('honorario')?'R$ '+g('honorario'):''],['13º',g('decimoTerceiro')],['Início trabalho',g('inicioTrab')],['Início cobrança',g('inicioCob')],['Contador',g('contadorAtual')],['Executivo',g('executivo')],['CS',g('csResp')],['Próximos passos',g('obsTrib')]]},
     {t:'Perfil comercial',c:[['Perfil',g('perfilCliente')],['Dor',g('dorCliente')],['Expectativa',g('expectativa')],['Meta 3 meses',g('metaCurto')],['Meta 1 ano',g('metaMedio')],['Critérios',g('criterio')],['Curva',g('curva')],['Prob. internos',g('probInt')],['Prob. externos',g('probExt')]]},
     {t:'Contatos',c:[['P-chave operac.',g('pessoaOp')],['P-chave financ.',g('pessoaFin')],['Decisor',g('decisor')],['E-mail',g('email')],['Telefone',g('telefone')],['Indicou',g('indicou')],['Canal',g('canal')]]},
@@ -697,7 +699,7 @@ function gerarResumo(){
   </div>
 
   ${sec('Dados cadastrais',2,
-    [rowH('Atividade',g('atividadePrincipal')),rowH('Endereço',g('localizacao')),
+    [rowH('Atividade principal',g('atividadePrincipal')),row('CNAEs',g('cnaes')?g('cnaes').replace(/\n/g,' | '):''),rowH('Endereço',g('localizacao')),
      row('Data de abertura',g('dataConst')),row('Porte',g('porte')),
      row('Capital social',g('capitalSocial')),row('Qtd. CNPJs/filiais',g('qtdCNPJ')),
      row('Qtd. funcionários',g('qtdFunc'))])}
