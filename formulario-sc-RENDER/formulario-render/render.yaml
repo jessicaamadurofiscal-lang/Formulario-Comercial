@@ -1,0 +1,14 @@
+services:
+  - type: web
+    name: formulario-sc
+    runtime: python
+    buildCommand: |
+      apt-get update -qq && apt-get install -y -qq tesseract-ocr tesseract-ocr-por poppler-utils
+      pip install pdfplumber pypdf Pillow pytesseract
+    startCommand: python app.py
+    envVars:
+      - key: PORT
+        value: 10000
+      - key: RENDER
+        value: true
+    plan: free
