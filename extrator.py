@@ -1,0 +1,437 @@
+"""
+extrator.py — Lê PDF de contrato social ou formulário e extrai dados estruturados
+Estratégias em ordem:
+  1. pdfplumber (texto nativo — melhor para contratos sociais digitais)
+  2. pypdf (fallback texto nativo)
+  3. OCR via tesseract (para PDFs escaneados ou exportados como imagem)
+Sem custo, sem internet, sem API.
+"""
+
+import re, sys, json, os, subprocess, tempfile
+from pathlib import Path
+
+try:
+    import pdfplumber; HAS_PLUMBER = True
+except ImportError:
+    HAS_PLUMBER = False
+
+try:
+    from pypdf import PdfReader; HAS_PYPDF = True
+except ImportError:
+    HAS_PYPDF = False
+
+try:
+    import pytesseract
+    from PIL import Image
+    HAS_OCR = True
+except ImportError:
+    HAS_OCR = False
+
+
+# ── EXTRAÇÃO DE TEXTO ─────────────────────────────────────────────────────────
+
+def extrair_texto_nativo(pdf: str) -> str:
+    texto = ""
+    if HAS_PLUMBER:
+        try:
+            with pdfplumber.open(pdf) as p:
+                texto = "\n".join(pg.extract_text() or "" for pg in p.pages)
+        except Exception: pass
+    if not texto.strip() and HAS_PYPDF:
+        try:
+            r = PdfReader(pdf)
+            texto = "\n".join(pg.extract_text() or "" for pg in r.pages)
+        except Exception: pass
+    return texto
+
+def extrair_texto_ocr(pdf: str) -> str:
+    """Rasteriza o PDF e aplica OCR página por página."""
+    texto_total = []
+    with tempfile.TemporaryDirectory() as tmp:
+        # Converte PDF → imagens via pdftoppm
+        prefix = os.path.join(tmp, "pag")
+        r = subprocess.run(
+            ["pdftoppm", "-jpeg", "-r", "250", pdf, prefix],
+            capture_output=True, timeout=120
+        )
+        imgs = sorted(Path(tmp).glob("*.jpg"))
+        if not imgs:
+            # Fallback: tenta com png
+            subprocess.run(["pdftoppm", "-png", "-r", "250", pdf, prefix], capture_output=True, timeout=120)
+            imgs = sorted(Path(tmp).glob("*.png"))
+
+        for img_path in imgs:
+            try:
+                if HAS_OCR:
+                    img = Image.open(str(img_path))
+                    # Tenta português primeiro, fallback inglês
+                    try:
+                        t = pytesseract.image_to_string(img, lang="por+eng")
+                    except Exception:
+                        try:
+                            t = pytesseract.image_to_string(img, lang="por")
+                        except Exception:
+                            t = pytesseract.image_to_string(img, lang="eng")
+                    texto_total.append(t)
+                else:
+                    # Tesseract direto via CLI
+                    r2 = subprocess.run(
+                        ["tesseract", str(img_path), "stdout", "-l", "por+eng"],
+                        capture_output=True, text=True, timeout=60
+                    )
+                    if r2.returncode != 0:
+                        r2 = subprocess.run(
+                            ["tesseract", str(img_path), "stdout", "-l", "eng"],
+                            capture_output=True, text=True, timeout=60
+                        )
+                    texto_total.append(r2.stdout)
+            except Exception as e:
+                print(f"[OCR] {img_path.name}: {e}", file=sys.stderr)
+
+    return "\n".join(texto_total)
+
+def extrair_texto(pdf: str) -> tuple[str, str]:
+    """Retorna (texto, método_usado)."""
+    t = extrair_texto_nativo(pdf)
+    if len(t.strip()) > 100:
+        return t, "nativo"
+    # PDF sem texto — usa OCR
+    t = extrair_texto_ocr(pdf)
+    return t, "ocr"
+
+
+# ── HELPERS ───────────────────────────────────────────────────────────────────
+
+def lim(s: str) -> str:
+    return re.sub(r'\s+', ' ', s or "").strip()
+
+def first(*patterns, texto="", flags=re.IGNORECASE) -> str:
+    for pat in patterns:
+        m = re.search(pat, texto, flags | re.DOTALL)
+        if m:
+            gs = [g for g in m.groups() if g]
+            if gs: return lim(gs[0])
+    return ""
+
+
+# ── EXTRATORES ────────────────────────────────────────────────────────────────
+
+def ext_cnpj(t):
+    for m in re.findall(r'\d{2}[\.\s]?\d{3}[\.\s]?\d{3}[\s\/]?\d{4}[-\s]?\d{2}', t):
+        d = re.sub(r'\D','',m)
+        if len(d)==14:
+            return f"{d[:2]}.{d[2:5]}.{d[5:8]}/{d[8:12]}-{d[12:]}"
+    return ""
+
+def ext_razao(t):
+    return first(
+        r'(?:denominada?|empresa|sociedade|firma)\s+["\']?([A-ZÁÉÍÓÚÂÊÔÃÕÇ][A-ZÁÉÍÓÚÂÊÔÃÕÇ\s\&\.\,\-]{5,80})["\']?',
+        r'(?:Raz[aã]o Social)\s*[:\-]?\s*([^\n]{5,80})',
+        r'^([A-ZÁÉÍÓÚÂÊÔÃÕÇ][A-ZÁÉÍÓÚÂÊÔÃÕÇ\s\&\.]{5,60}(?:LTDA|ME|EIRELI|S\.A\.|EPP|MEI)\.?)',
+        r'([A-ZÁÉÍÓÚÂÊÔÃÕÇ][A-ZÁÉÍÓÚÂÊÔÃÕÇ\s\&\.]{5,60}(?:LTDA|ME|EIRELI|S\.A\.|EPP|MEI)\.?)',
+        texto=t
+    )
+
+def ext_atividade(t):
+    return first(
+        r'(?:Atividade Principal|objeto social|ramo de atividade)\s*[:\-]?\s*([^\n]{15,200})',
+        r'(?:CNAE|c[oó]digo de atividade)\s*[:\-]?\s*[\d\.]+\s*[-–]\s*([^\n]{10,120})',
+        r'tem por objeto\s+(?:social\s+)?(.{15,200}?)(?:\.|$)',
+        texto=t
+    )
+
+def ext_capital(t):
+    v = first(
+        r'(?:capital social|Capital Social|Valor do Honor[aá]rio)\s*[:\-]?\s*R\$\s*([\d\.\,]+)',
+        r'R\$\s*([\d\.\,]+)\s*\(.*?reais',
+        texto=t
+    )
+    # "Valor do Honorário" é honorário, não capital — tratado separado
+    cap = first(
+        r'[Cc]apital\s+[Ss]ocial.*?R\$\s*([\d\.\,]+)',
+        r'[Cc]apital\s+(?:subscrito|integralizado).*?R\$\s*([\d\.\,]+)',
+        texto=t
+    )
+    return f"R$ {cap}" if cap else ""
+
+def ext_honorario(t):
+    v = first(
+        r'[Vv]alor do [Hh]onor[aá]rio\s*[:\-]?\s*R\$\s*([\d\.\,]+)',
+        r'[Hh]onor[aá]rio[s]?\s*[:\-]?\s*R\$\s*([\d\.\,]+)',
+        texto=t
+    )
+    return f"R$ {v}" if v else ""
+
+def ext_socios(t):
+    socios = set()
+    for m in re.findall(
+        r'([A-ZÁÉÍÓÚÂÊÔÃÕÇ][a-záéíóúâêôãõç]+(?:\s+[A-ZÁÉÍÓÚÂÊÔÃÕÇ][a-záéíóúâêôãõç]+){1,5})'
+        r'(?:,|\s+)(?:portador|inscrito|CPF|brasileiro|brasileira)',
+        t, re.IGNORECASE
+    ): socios.add(lim(m))
+
+    bloco = first(r'(?:s[oó]cios?|quadro societ[aá]rio)\s*[:\-]?\s*((?:[^\n]+\n){1,15})', texto=t)
+    if bloco:
+        for linha in bloco.split('\n'):
+            m = re.match(r'^([A-ZÁÉÍÓÚÂÊÔÃÕÇ][a-záéíóúâêôãõç]+(?:\s+[A-ZÁÉÍÓÚÂÊÔÃÕÇ][a-záéíóúâêôãõç]+){1,4})', linha.strip())
+            if m: socios.add(lim(m.group(1)))
+
+    excl = {'Ltda','Eireli','Brasil','Social','Capital','Objeto','Contrato','Nacional','Presumido'}
+    return [s for s in socios if len(s)>8 and s not in excl][:8]
+
+def ext_endereco(t):
+    return first(
+        r'(?:sede|endere[çc]o|domicílio|situada?)\s+(?:na|em|[àa]|no)?\s*([A-ZÁÉÍÓÚ][^\n]{15,150}(?:nº|n\.|n[úu]mero|\d+)[^\n]{0,80})',
+        r'(?:Rua|Av\.|Avenida|Alameda|Travessa|Rod\.|Rodovia|Pra[çc]a)\s+[^\n]{10,120}',
+        r'(?:Logradouro|Endere[çc]o)\s*[:\-]?\s*([^\n]{15,120})',
+        r'Localiza[çc][aã]o\s*[:\-]?\s*([^\n]{10,150})',
+        texto=t
+    )
+
+def ext_data(t):
+    return first(
+        r'(?:constitu[iíi]da?|fundada?|celebrado?)\s+(?:em|no dia|na data de)?\s*(\d{1,2}[\s\/\-\.]+(?:de\s+)?(?:janeiro|fevereiro|março|abril|maio|junho|julho|agosto|setembro|outubro|novembro|dezembro|\d{1,2})[\s\/\-\.]+(?:de\s+)?\d{4})',
+        r'[Dd]ata\s+(?:de\s+)?(?:abertura|constitu[iíi][çc][aã]o)\s*[:\-]?\s*(\d{1,2}[\s\/\-\.]\d{1,2}[\s\/\-\.]\d{4})',
+        r'[Ii]nício do [Tt]rabalho\s*[:\-]?\s*(\d{1,2}[\s\/\-\.]\d{1,2}[\s\/\-\.]\d{4})',
+        texto=t
+    )
+
+def ext_regime(t):
+    tl = t.lower()
+    if 'simples nacional' in tl: return 'Simples Nacional'
+    if 'lucro presumido'  in tl: return 'Lucro Presumido'
+    if 'lucro real'       in tl: return 'Lucro Real'
+    if 'microempreendedor' in tl or ' mei ' in tl: return 'MEI'
+    return ''
+
+def inferir_porte(t, cap):
+    tl = t.lower()
+    if 'microempreendedor individual' in tl: return 'MEI'
+    if cap:
+        d = re.sub(r'[^\d]','', cap.replace(',','.').split('.')[0])
+        try:
+            v = float(d)
+            if   v <= 81_000:    return 'MEI'
+            elif v <= 360_000:   return 'ME'
+            elif v <= 4_800_000: return 'EPP'
+            else:                return 'Médio Porte'
+        except: pass
+    if 'microempresa' in tl: return 'ME'
+    if 'empresa de pequeno porte' in tl: return 'EPP'
+    if 'eireli' in tl: return 'ME'
+    return ''
+
+def ext_email(t):
+    emails = re.findall(r'[\w\.\-\+]+@[\w\-]+\.[\w\.\-]+', t)
+    for e in emails:
+        if not any(x in e for x in ['gov.br','receita','junta']): return e
+    return emails[0] if emails else ""
+
+def ext_telefone(t):
+    for m in re.findall(r'(?:\(?\d{2}\)?\s?)?(?:9\s?)?\d{4}[\s\-]?\d{4}', t):
+        if len(re.sub(r'\D','',m)) >= 8: return m.strip()
+    return ""
+
+def ext_nome_grupo(t, razao):
+    n = first(
+        r'[Nn]ome [Ff]antasia\s*[:\-]?\s*([^\n]{5,60})',
+        r'[Nn]ome do [Gg]rupo\s*[:\-]?\s*([^\n]{5,60})',
+        r'[Gg]rupo\s+([A-ZÁÉÍÓÚÂÊÔÃÕÇ][A-ZÁÉÍÓÚÂÊÔÃÕÇ\s]{3,40})',
+        texto=t
+    )
+    if n: return n
+    if razao and 'grupo' in razao.lower(): return razao
+    if razao:
+        return re.sub(r'\b(LTDA|ME|EIRELI|EPP|S\.A\.?|MEI)\b','',razao,flags=re.I).strip().title()
+    return ""
+
+# Campos extras para o formulário comercial S&C
+def ext_campo(t, *labels):
+    """Extrai valor de campos no formato 'Label: Valor' do formulário."""
+    for label in labels:
+        m = re.search(rf'{re.escape(label)}\s*[:\-]?\s*([^\n]{{3,200}})', t, re.IGNORECASE)
+        if m:
+            val = lim(m.group(1))
+            # Remove artefatos de OCR
+            val = re.sub(r'^[:\-\s]+','', val).strip()
+            if val and val not in ('—','N/A','','-'): return val
+    return ""
+
+
+# ── FUNÇÃO PRINCIPAL ──────────────────────────────────────────────────────────
+
+def extrair_dados(pdf: str) -> dict:
+    texto, metodo = extrair_texto(pdf)
+
+    if not texto.strip():
+        return {"erro": "Não foi possível extrair texto. Verifique se o PDF está legível."}
+
+    # Contagem de páginas
+    npages = 0
+    if HAS_PLUMBER:
+        try:
+            with pdfplumber.open(pdf) as p: npages = len(p.pages)
+        except: pass
+
+    cnpj    = ext_cnpj(texto)
+    razao   = ext_razao(texto)
+    capital = ext_capital(texto)
+    socios  = ext_socios(texto)
+
+    # Tenta extrair campos do formulário S&C (preenchido)
+    nome_grupo      = ext_campo(texto, "Nome do Grupo")
+    atividade       = ext_campo(texto, "Atividade Principal") or ext_atividade(texto)
+    honorario       = ext_campo(texto, "Valor do Honorário", "Valor do Honorario") or ext_honorario(texto)
+    inicio_trab     = ext_campo(texto, "Início do Trabalho", "Inicio do Trabalho")
+    inicio_cob      = ext_campo(texto, "Início da Cobrança", "Inicio da Cobrança de Honorário")
+    decimo          = ext_campo(texto, "Décimo Terceiro", "Decimo Terceiro")
+    obs             = ext_campo(texto, "Observações", "Observacoes", "Observação")
+    tipo_servico    = ext_campo(texto, "Tipo de Serviço", "Tipo de Servico", "Tipo de Servic")
+    qtd_cnpj        = ext_campo(texto, "Quantidade de CNPJ", "Qtd de CNPJ")
+    executivo       = ext_campo(texto, "Executivo De Vendas Responsável", "Executivo De Vendas")
+    cs_resp         = ext_campo(texto, "Sucesso do Cliente Responsável", "Sucesso do Cliente")
+    contador        = ext_campo(texto, "Atual Contador", "Contador")
+    contato_cont    = ext_campo(texto, "Contato do Contador")
+    perfil          = ext_campo(texto, "Como esse Cliente é", "Como esse Cliente e")
+    expectativa     = ext_campo(texto, "Qual a Expectativa", "Expectativa")
+    canal           = ext_campo(texto, "Como ele Prefere a Comunicação", "Como ele Prefere")
+    dor             = ext_campo(texto, "Qual a Dor", "Dor del")
+    espera          = ext_campo(texto, "O Que ele Espera da Gente")
+    meta_curto      = ext_campo(texto, "Metas de Curto Prazo", "Meta de Curto Prazo")
+    meta_medio      = ext_campo(texto, "Metas de Médio Prazo", "Meta de Médio Prazo")
+    criterio        = ext_campo(texto, "Critérios de Sucesso", "Criterios de Sucesso")
+    curva           = ext_campo(texto, "Potencial de Curva")
+    prob_int        = ext_campo(texto, "Problemas Internos")
+    prob_ext        = ext_campo(texto, "Problemas Externos")
+    impacto         = ext_campo(texto, "Impacto Atual das Dores")
+    parcelamento    = ext_campo(texto, "Possui Parcelamento")
+    domestica       = ext_campo(texto, "Possui Doméstica", "Possui Domestica")
+    prod_rural      = ext_campo(texto, "Possui Produtor Rural")
+    softwares       = ext_campo(texto, "Ferramentas/Softwares", "Ferramentas")
+    processos_int   = ext_campo(texto, "Processos Internos que se Conectam")
+    email_report    = ext_campo(texto, "Email para Recebimento do Report")
+    email_guias     = ext_campo(texto, "Email para Recebimento das Guias")
+    pessoa_op       = ext_campo(texto, "Pessoa-chave operacional")
+    pessoa_fin      = ext_campo(texto, "Pessoa-chave financeira")
+    decisor         = ext_campo(texto, "Decisor final", "Decisor Final", "Camisa 10")
+
+    # Campos de contrato social (quando não é formulário)
+    if not razao:   razao   = ext_campo(texto, "Razão Social", "Razao Social")
+    if not cnpj:    cnpj    = ""
+    endereco   = ext_campo(texto, "Localização", "Localizacao", "Endereço", "Endereco") or ext_endereco(texto)
+    data_const = ext_campo(texto, "Data Prevista de Início", "Data de Constituição") or ext_data(texto)
+
+    regime_raw = ext_campo(texto, "Tributação", "Tributacao", "Regime")
+    regime = ext_regime(regime_raw or texto)
+
+    # Nome do grupo: prioridade ao campo explícito
+    if not nome_grupo:
+        nome_grupo = ext_nome_grupo(texto, razao)
+
+    # Sócios: tenta pegar dos campos do formulário
+    if not socios:
+        pco = ext_campo(texto, "Pessoa-chave operacional") or ext_campo(texto, "Executivo") or ""
+        pcf = ext_campo(texto, "Pessoa-chave financeira") or ""
+        socios_form = [s for s in [pco, pcf] if s]
+        socios = socios_form if socios_form else socios
+
+    socio_op  = pessoa_op  or (socios[0] if socios else "")
+    socio_fin = pessoa_fin or (socios[1] if len(socios)>1 else "")
+
+    email    = email_report or ext_email(texto)
+    telefone = ext_telefone(texto)
+
+    # Normaliza curva (A/B/C)
+    if curva:
+        m = re.search(r'\b([ABC])\b', curva.upper())
+        curva = m.group(1) if m else curva
+
+    return {
+        # Dados do grupo
+        "nomeGrupo":          nome_grupo,
+        "razaoSocial":        razao,
+        "cnpj":               cnpj,
+        "atividadePrincipal": atividade,
+        "porte":              inferir_porte(texto, capital),
+        "capitalSocial":      capital,
+        "regime":             regime,
+        "localizacao":        endereco,
+        "dataConstituicao":   data_const,
+        # Tributário
+        "tipoServico":        tipo_servico,
+        "honorario":          honorario,
+        "inicioTrabalho":     inicio_trab,
+        "inicioCobranca":     inicio_cob,
+        "decimoTerceiro":     decimo,
+        "contadorAtual":      contador,
+        "contatoContador":    contato_cont,
+        "executivo":          executivo,
+        "csResponsavel":      cs_resp,
+        "obsGerais":          obs,
+        # Comercial
+        "perfilCliente":      perfil,
+        "expectativa":        expectativa,
+        "dorCliente":         dor,
+        "esperaDaGente":      espera,
+        "metaCurto":          meta_curto,
+        "metaMedio":          meta_medio,
+        "criterioSucesso":    criterio,
+        "curva":              curva,
+        "probInterno":        prob_int,
+        "probExterno":        prob_ext,
+        # Contatos
+        "email":              email,
+        "emailGuias":         email_guias,
+        "telefone":           telefone,
+        "pessoaOperacional":  socio_op,
+        "pessoaFinanceira":   socio_fin,
+        "decisor":            decisor,
+        "canal":              canal,
+        # Operacional
+        "qtdCNPJ":            qtd_cnpj,
+        "parcelamento":       parcelamento,
+        "domestica":          domestica,
+        "produtorRural":      prod_rural,
+        "softwares":          softwares,
+        "processosInternos":  processos_int,
+        # Metadados
+        "todosSocios":        socios,
+        "_metodo":            metodo,
+        "_paginas":           npages or 1,
+        "_chars":             len(texto),
+    }
+
+
+if __name__ == "__main__":
+    if len(sys.argv) < 2:
+        print(json.dumps({"erro": "Uso: python extrator.py arquivo.pdf"}))
+        sys.exit(1)
+    dados = extrair_dados(sys.argv[1])
+    print(json.dumps(dados, ensure_ascii=False, indent=2))
+
+
+# Adicionar limpeza de artefatos OCR ao final de extrair_dados já está implícita
+# nos patterns acima — esta função pode ser chamada externamente para limpar
+def limpar_artefatos(d: dict) -> dict:
+    """Remove prefixos residuais de OCR dos valores."""
+    prefixos = [
+        r'^(?:dele?|dela|do|da|de|que)\s*[:\-]?\s*',
+        r'^\s*\(Até \d+ (?:Meses?|Ano)\)\s*[:\-]?\s*',
+        r'^\s*para o Cliente\s*[:\-]?\s*',
+        r'^\s*\(Camisa 10\)\s*[:\-]?\s*',
+        r'^\s*Responsavel?\s*[:\-]?\s*',
+        r'^\s*[aà] Comunicag[aã]o\s*[:\-]?\s*',
+        r'^\s*\(Considerar Filiais\)\s*[:\-]?\s*',
+        r'^\s*de Parcelamento\s*[:\-]?\s*',
+        r'^\s*que já? U\s*Pe?\s*$',
+        r'^\s*ao Servi[çc]o Contratado\s*[:\-]?\s*$',
+        r'^\s*\?\s*',
+    ]
+    resultado = {}
+    for k, v in d.items():
+        if isinstance(v, str) and v:
+            for pat in prefixos:
+                v = re.sub(pat, '', v, flags=re.IGNORECASE).strip()
+            v = v.strip(' ,;:-')
+        resultado[k] = v
+    return resultado
