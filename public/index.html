@@ -260,8 +260,8 @@ input.auto,select.auto,textarea.auto{background:var(--green-bg);border-color:var
   <div class="pb">
     <div class="up-zone" id="upz">
       <svg class="up-icon" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
-      <h3>Arraste o documento aqui</h3>
-      <p>ou clique para selecionar · até 20 MB</p>
+      <h3>Arraste os documentos aqui</h3>
+      <p>ou clique para selecionar · vários PDFs ao mesmo tempo · até 20 MB cada</p>
       <div class="up-types">
         <span class="up-type">Contrato Social</span>
         <span class="up-type">Cartão CNPJ</span>
@@ -269,7 +269,7 @@ input.auto,select.auto,textarea.auto{background:var(--green-bg);border-color:var
         <span class="up-type">Qualquer PDF</span>
       </div>
     </div>
-    <input type="file" id="fi" accept=".pdf,.PDF">
+    <input type="file" id="fi" accept=".pdf,.PDF" multiple>
     <div class="proc" id="proc">
       <div class="spin-wrap"><div class="spin"></div><div class="spin-inner"></div></div>
       <h3>Lendo documento...</h3>
@@ -519,23 +519,56 @@ const upz=q('#upz'),fi=q('#fi');
 upz.addEventListener('click',()=>fi.click());
 upz.addEventListener('dragover',e=>{e.preventDefault();upz.classList.add('drag')});
 upz.addEventListener('dragleave',()=>upz.classList.remove('drag'));
-upz.addEventListener('drop',e=>{e.preventDefault();upz.classList.remove('drag');if(e.dataTransfer.files[0])proc(e.dataTransfer.files[0])});
-fi.addEventListener('change',e=>{if(e.target.files[0])proc(e.target.files[0])});
+upz.addEventListener('drop',e=>{e.preventDefault();upz.classList.remove('drag');if(e.dataTransfer.files.length)proc([...e.dataTransfer.files])});
+fi.addEventListener('change',e=>{if(e.target.files.length)proc([...e.target.files])});
 
 const MSGS=['Extraindo texto do PDF...','Identificando dados...','Aplicando OCR se necessário...','Localizando CNPJ e endereço...','Identificando sócios e responsáveis...','Finalizando extração...'];
-async function proc(file){
+
+// Processa UM arquivo e retorna o dict de dados
+async function extrairArquivo(file){
+  const fd=new FormData();fd.append('contrato',file);
+  const r=await fetch('/api/extrair',{method:'POST',body:fd});
+  const d=await r.json();
+  if(!r.ok||d.erro)throw new Error(d.erro||'Erro em '+file.name);
+  return d.data;
+}
+
+// Mescla dois dicts: mantém o valor existente, preenche onde está vazio
+function mesclar(base,extra){
+  const out={...base};
+  for(const k of Object.keys(extra)){
+    const v=extra[k];
+    if(!v||v===''||(Array.isArray(v)&&!v.length)) continue;
+    const b=out[k];
+    if(!b||b===''||(Array.isArray(b)&&!b.length)){
+      out[k]=v;
+    } else if(Array.isArray(b)&&Array.isArray(v)){
+      // Une arrays sem duplicatas
+      const set=new Set([...b,...v]);
+      out[k]=[...set];
+    }
+  }
+  return out;
+}
+
+async function proc(files){
+  if(!files||!files.length) return;
   upz.style.display='none';q('#proc').classList.add('show');al('','');
   let mi=0;const t=setInterval(()=>{if(mi<MSGS.length-1)q('#pmsg').textContent=MSGS[++mi]},1800);
   try{
-    const fd=new FormData();fd.append('contrato',file);
-    const r=await fetch('/api/extrair',{method:'POST',body:fd});
-    const d=await r.json();
+    const total=files.length;
+    let dados={};
+    for(let i=0;i<total;i++){
+      q('#pmsg').textContent=total>1?`Lendo documento ${i+1} de ${total}...`:MSGS[0];
+      const d=await extrairArquivo(files[i]);
+      dados=mesclar(dados,d);
+    }
     clearInterval(t);q('#proc').classList.remove('show');upz.style.display='';
-    if(!r.ok||d.erro)throw new Error(d.erro||'Erro desconhecido');
-    fill(d.data);
-    const n=Object.values(d.data).filter(v=>v&&v!==''&&(!Array.isArray(v)||v.length>0)).length;
+    fill(dados);
+    const n=Object.values(dados).filter(v=>v&&v!==''&&(!Array.isArray(v)||v.length>0)).length;
+    const msg=total>1?`${total} documentos lidos — ${n} dados extraídos`:`Documento lido — ${n} dados extraídos`;
     al('ok',`${n} informações extraídas com sucesso`,` Campos em verde foram preenchidos automaticamente. Complete os campos em laranja.`);
-    toast(`✓ Documento lido — ${n} dados extraídos`);
+    toast('✓ '+msg);
   }catch(e){
     clearInterval(t);q('#proc').classList.remove('show');upz.style.display='';
     al('err','Erro ao processar documento',e.message);
