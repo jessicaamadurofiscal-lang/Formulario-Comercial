@@ -116,6 +116,14 @@ textarea{resize:vertical;min-height:68px;line-height:1.65}
 input.auto,select.auto,textarea.auto{background:var(--green-bg);border-color:var(--green-bd);color:#0a5040}
 .sdiv{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:var(--silver);border-bottom:1px solid var(--border);padding-bottom:7px;margin:1.6rem 0 1.1rem;display:flex;align-items:center;gap:8px}
 .sdiv::before{content:'';display:block;width:3px;height:11px;background:var(--navy);border-radius:2px;flex-shrink:0}
+.hint{font-size:11px;color:var(--text-m);line-height:1.45}
+.cnpj-status{font-size:11.5px;line-height:1.45;font-weight:700}
+.cnpj-status:empty{display:none}
+.cnpj-status.load{color:var(--text-s)}
+.cnpj-status.ok{color:var(--green)}
+.cnpj-status.warn{color:var(--amber)}
+.cnpj-status.err{color:#A32D2D}
+.fil-card{border:1px solid var(--border-m);border-left:3px solid var(--navy);border-radius:var(--r);padding:12px 12px 0;margin-bottom:12px;background:var(--silver-xl)}
 
 /* ── CHIPS ── */
 .chips{display:flex;gap:7px;flex-wrap:wrap}
@@ -319,11 +327,15 @@ input.auto,select.auto,textarea.auto{background:var(--green-bg);border-color:var
   <div class="pb">
     <div class="socios-box" id="sbx"><div class="fl">Sócios encontrados <span class="badge b-auto">Auto</span></div><div class="socios-tags" id="stags"></div></div>
     <div class="grid g2">
-      <div class="fg"><div class="fl">Nome do grupo <span class="badge b-auto" id="b-ng" style="display:none">Auto</span></div><input id="nomeGrupo" placeholder="Ex: Grupo Ki Angelim"></div>
+      <div class="fg"><div class="fl">Nome da empresa <span class="badge b-auto" id="b-ng" style="display:none">Auto</span></div><input id="nomeGrupo" placeholder="Ex: Timex Sul"></div>
       <div class="fg"><div class="fl">Razão social <span class="badge b-auto" id="b-rs" style="display:none">Auto</span></div><input id="razaoSocial" placeholder="Razão social completa"></div>
     </div>
     <div class="grid g2">
-      <div class="fg"><div class="fl">CNPJ <span class="badge b-auto" id="b-cnpj" style="display:none">Auto</span></div><input id="cnpj" placeholder="00.000.000/0001-00"></div>
+      <div class="fg"><div class="fl">GRUPO <span class="badge b-man">Manual</span></div><input id="grupoEmp" placeholder="Ex: Fabrimar"><div class="hint">Repita o mesmo nome em todas as empresas de CNPJs diferentes que fazem parte do grupo.</div></div>
+      <div class="fg"><div class="fl">Nome fantasia <span class="badge b-auto" id="b-nf" style="display:none">Auto</span></div><input id="nomeFantasia" placeholder="Nome fantasia"></div>
+    </div>
+    <div class="grid g2">
+      <div class="fg"><div class="fl">CNPJ <span class="badge b-auto" id="b-cnpj" style="display:none">Auto</span></div><input id="cnpj" inputmode="numeric" maxlength="18" placeholder="00.000.000/0001-00" oninput="onCnpjInput(this)"><div class="cnpj-status" id="cnpjStatus"></div></div>
       <div class="fg"><div class="fl">Data de abertura <span class="badge b-auto" id="b-dc" style="display:none">Auto</span></div><input id="dataConst" placeholder="DD/MM/AAAA"></div>
     </div>
     <div class="grid g2">
@@ -336,8 +348,16 @@ input.auto,select.auto,textarea.auto{background:var(--green-bg);border-color:var
     <div class="grid g1"><div class="fg"><div class="fl">Endereço <span class="badge b-auto" id="b-end" style="display:none">Auto</span></div><input id="localizacao" placeholder="Rua, número — Bairro, Cidade/UF"></div></div>
     <div class="grid g1"><div class="fg"><div class="fl">CNAEs / atividades <span class="badge b-auto" id="b-cnaes" style="display:none">Auto</span></div><textarea id="cnaes" placeholder="Atividades econômicas (principal e secundárias) — extraídas do cartão CNPJ" style="min-height:80px"></textarea></div></div>
     <div class="grid g2">
+      <div class="fg"><div class="fl">Situação cadastral <span class="badge b-auto" id="b-sit" style="display:none">Auto</span></div><input id="situacaoCadastral" placeholder="Preenchida pela consulta do CNPJ"></div>
       <div class="fg"><div class="fl">Qtd. funcionários <span class="badge b-man">Manual</span></div><input type="number" id="qtdFunc" placeholder="0"></div>
-      <div class="fg"><div class="fl">Qtd. CNPJs / filiais <span class="badge b-auto" id="b-qcnpj" style="display:none">Auto</span><span class="badge b-man" id="bm-qcnpj">Manual</span></div><input id="qtdCNPJ" placeholder="0" oninput="toggleFilial()"></div>
+    </div>
+    <div class="grid g2">
+      <div class="fg"><div class="fl">Quantidade de filiais <span class="badge b-man">Manual</span></div><input type="number" id="qtdFiliais" min="0" max="50" placeholder="0" oninput="syncFromFiliais()"><div class="hint">Abre um campo de CNPJ para cada filial.</div></div>
+      <div class="fg"><div class="fl">Qtd. total de CNPJs (matriz + filiais) <span class="badge b-auto" id="b-qcnpj" style="display:none">Auto</span><span class="badge b-man" id="bm-qcnpj">Manual</span></div><input id="qtdCNPJ" placeholder="0" oninput="toggleFilial()"></div>
+    </div>
+    <div id="filialCnpjWrap" style="display:none">
+      <div class="sdiv">CNPJ das filiais</div>
+      <div id="filialCnpjFields"></div>
     </div>
     <div class="grid g1"><div class="fg"><div class="fl">Observações <span class="badge b-auto" id="b-obs" style="display:none">Auto</span></div><textarea id="obsGerais" placeholder="Holding, empresa paralisada, filiais, particularidades..."></textarea></div></div>
     <div class="actions">
@@ -518,7 +538,9 @@ input.auto,select.auto,textarea.auto{background:var(--green-bg);border-color:var
       </div>
       <div class="btn-grp">
         <button class="btn btn-sm" onclick="copiar()" id="bcopy">Copiar dados</button>
-        <button class="btn btn-primary btn-sm" onclick="imprimir()">Imprimir / Salvar PDF</button>
+        <button class="btn btn-sm" onclick="copiar(true)">Copiar sem valores</button>
+        <button class="btn btn-primary btn-sm" onclick="imprimir()">PDF completo (com valores)</button>
+        <button class="btn btn-navy btn-sm" onclick="imprimir(true)">PDF sem valores</button>
       </div>
     </div>
   </div>
@@ -667,7 +689,10 @@ function fill(d){
   set('decisor',d.decisor,'b-dec2');
   set('parcelamento',d.parcelamento,'b-par');set('domestica',d.domestica,'b-dom');set('prodRural',d.produtorRural,'b-pr');
   set('processos',d.processosInternos,'b-proc');set('emailRel',d.email||d.emailGuias,'b-erel');
-  if(d.todosSocios&&d.todosSocios.length){q('#sbx').style.display='block';q('#stags').innerHTML=d.todosSocios.map(s=>`<div class="stag">${s}</div>`).join('');}
+  if(d.todosSocios&&d.todosSocios.length){q('#sbx').style.display='block';delete q('#sbx').dataset.src;q('#stags').innerHTML=d.todosSocios.map(s=>`<div class="stag">${esc(s)}</div>`).join('');}
+  // CNPJ lido do PDF → completa, na Receita, só o que o documento não trouxe
+  const dc=soDig(g('cnpj'));
+  if(dc.length===14&&validaCnpj(dc))consultarPrincipal(true);
 }
 
 /* ── MULTI-SELECT TIPO DE SERVIÇO ── */
@@ -768,10 +793,289 @@ function aplicar13(honId,v13Id,badgeId){
 function toggleFilial(){
   const raw=document.getElementById('qtdCNPJ').value;
   const n=parseInt(String(raw).replace(/\D/g,''),10);
-  const numFiliais=(!isNaN(n)&&n>1)?n-1:0;
+  const numFiliais=(!isNaN(n)&&n>1)?Math.min(n-1,50):0;
+  // mantém o campo "Quantidade de filiais" em sincronia com o total de CNPJs
+  const qf=document.getElementById('qtdFiliais');
+  if(!isNaN(n)){if(qf.value!==String(numFiliais))qf.value=numFiliais;}
+  else if(String(raw).trim()===''&&qf.value!=='')qf.value='';
   document.getElementById('filialWrap').style.display=numFiliais>0?'block':'none';
   document.getElementById('honLbl').textContent=numFiliais>0?'(Matriz) (R$)':'(R$)';
   renderFiliais(numFiliais);
+  renderCnpjFiliais(numFiliais);
+}
+// Digitou a quantidade de filiais → total de CNPJs = matriz + filiais
+function syncFromFiliais(){
+  const n=parseInt(document.getElementById('qtdFiliais').value,10);
+  const qc=document.getElementById('qtdCNPJ');
+  if(isNaN(n)||n<0){qc.value='';}
+  else{
+    const nn=Math.min(n,50);
+    if(nn!==n)document.getElementById('qtdFiliais').value=nn;
+    qc.value=String(nn+1);
+  }
+  const bm=document.getElementById('bm-qcnpj');if(bm)bm.style.display='inline';
+  const ba=document.getElementById('b-qcnpj');if(ba)ba.style.display='none';
+  qc.classList.remove('auto');
+  toggleFilial();
+}
+
+/* ── CONSULTA DE CNPJ (BrasilAPI → ReceitaWS) E CNPJ DAS FILIAIS ── */
+const esc=s=>String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const soDig=s=>String(s||'').replace(/\D/g,'');
+function maskCnpj(v){
+  const d=soDig(v).slice(0,14);let o='';
+  for(let i=0;i<d.length;i++){if(i===2||i===5)o+='.';if(i===8)o+='/';if(i===12)o+='-';o+=d[i];}
+  return o;
+}
+function validaCnpj(d){
+  if(d.length!==14||/^(\d)\1+$/.test(d))return false;
+  const dv=len=>{let s=0,p=len-7;for(let i=0;i<len;i++){s+=(+d[i])*p--;if(p<2)p=9;}const r=s%11;return r<2?0:11-r;};
+  return dv(12)===+d[12]&&dv(13)===+d[13];
+}
+function setStatus(id,tipo,txt){
+  const el=document.getElementById(id);if(!el)return;
+  el.className='cnpj-status'+(tipo?' '+tipo:'');el.textContent=txt||'';
+}
+const _cnpjErr=(code,msg)=>Object.assign(new Error(msg),{code});
+async function fetchJson(url,ms=12000){
+  const ctl=new AbortController();const t=setTimeout(()=>ctl.abort(),ms);
+  try{
+    const r=await fetch(url,{signal:ctl.signal,headers:{'Accept':'application/json'}});
+    let j=null;try{j=await r.json();}catch(_){}
+    return{ok:r.ok,status:r.status,json:j};
+  }finally{clearTimeout(t);}
+}
+function fmtCnae(c){
+  const s=soDig(c);if(!s||/^0+$/.test(s))return'';
+  const p=s.padStart(7,'0');return`${p.slice(0,4)}-${p.slice(4,5)}/${p.slice(5)}`;
+}
+function dataBR(s){
+  s=String(s||'');
+  const m=s.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if(m)return`${m[3]}/${m[2]}/${m[1]}`;
+  return/^\d{2}\/\d{2}\/\d{4}$/.test(s)?s:'';
+}
+function moedaAPI(v){
+  const n=typeof v==='number'?v:parseFloat(String(v||'').replace(',','.'));
+  return(isFinite(n)&&n>0)?'R$ '+formatMoeda(n):'';
+}
+function mapPorte(p,mei){
+  if(mei)return'MEI';
+  const s=String(p||'').toUpperCase();
+  if(s.includes('MICRO'))return'ME';
+  if(s.includes('PEQUENO'))return'EPP';
+  return'';   // "DEMAIS" não diz se é médio ou grande — deixa para preenchimento manual
+}
+function montaEndereco(tipo,log,num,compl,bairro,mun,uf,cep){
+  let a=String(log||'').trim();
+  if(tipo&&a&&!a.toUpperCase().startsWith(String(tipo).trim().toUpperCase()))a=String(tipo).trim()+' '+a;
+  if(a){const n=String(num||'').trim();a+=', '+((!n||/^S\/?N$/i.test(n))?'S/N':n);if(compl&&String(compl).trim())a+=' - '+String(compl).trim();}
+  const loc=[mun,uf].filter(Boolean).join('/');
+  const mid=[bairro,loc].filter(Boolean).join(', ');
+  let out=[a,mid].filter(Boolean).join(' — ');
+  const c=soDig(cep);if(c.length===8)out+=(out?' — ':'')+'CEP '+c.slice(0,5)+'-'+c.slice(5);
+  return out;
+}
+function normBrasilApi(j){
+  const mei=j.opcao_pelo_mei===true,simples=j.opcao_pelo_simples===true;
+  let regime='';
+  if(mei)regime='MEI';
+  else if(simples)regime='Simples Nacional';
+  else if(Array.isArray(j.regime_tributario)&&j.regime_tributario.length){
+    const ult=[...j.regime_tributario].sort((a,b)=>(b.ano||0)-(a.ano||0))[0];
+    const f=String(ult.forma_de_tributacao||'').toUpperCase();
+    if(f.includes('REAL'))regime='Lucro Real';else if(f.includes('PRESUMIDO'))regime='Lucro Presumido';
+  }
+  const cnaes=[];
+  const cp=fmtCnae(j.cnae_fiscal);
+  if(cp)cnaes.push(`${cp} - ${j.cnae_fiscal_descricao||''} (principal)`);
+  (j.cnaes_secundarios||[]).forEach(c=>{const f=fmtCnae(c.codigo);if(f)cnaes.push(`${f} - ${c.descricao||''}`);});
+  return{
+    razao:j.razao_social||'',fantasia:j.nome_fantasia||'',situacao:j.descricao_situacao_cadastral||'',
+    abertura:dataBR(j.data_inicio_atividade),capital:moedaAPI(j.capital_social),
+    porte:mapPorte(j.porte,mei),atividade:j.cnae_fiscal_descricao||'',cnaes,
+    endereco:montaEndereco(j.descricao_tipo_de_logradouro,j.logradouro,j.numero,j.complemento,j.bairro,j.municipio,j.uf,j.cep),
+    regime,socios:(j.qsa||[]).map(s=>s.nome_socio).filter(Boolean)
+  };
+}
+function normReceitaWs(j){
+  const mei=!!(j.simei&&j.simei.optante===true),simples=!!(j.simples&&j.simples.optante===true);
+  const ap=(j.atividade_principal||[])[0]||{};
+  const cnaes=[];
+  const cp=fmtCnae(ap.code);
+  if(cp)cnaes.push(`${cp} - ${ap.text||''} (principal)`);
+  (j.atividades_secundarias||[]).forEach(c=>{const f=fmtCnae(c.code);if(f)cnaes.push(`${f} - ${c.text||''}`);});
+  return{
+    razao:j.nome||'',fantasia:j.fantasia||'',situacao:j.situacao||'',
+    abertura:dataBR(j.abertura),capital:moedaAPI(j.capital_social),
+    porte:mapPorte(j.porte,mei),atividade:ap.text||'',cnaes,
+    endereco:montaEndereco('',j.logradouro,j.numero,j.complemento,j.bairro,j.municipio,j.uf,j.cep),
+    regime:mei?'MEI':(simples?'Simples Nacional':''),socios:(j.qsa||[]).map(s=>s.nome).filter(Boolean)
+  };
+}
+const _cnpjCache=new Map();
+async function buscarCnpj(d){
+  if(_cnpjCache.has(d))return _cnpjCache.get(d);
+  let naoEncontrado=false;
+  try{ // 1ª opção: BrasilAPI
+    const r=await fetchJson('https://brasilapi.com.br/api/cnpj/v1/'+d);
+    if(r.ok&&r.json&&r.json.razao_social){const x=normBrasilApi(r.json);x.fonte='BrasilAPI';_cnpjCache.set(d,x);return x;}
+    if(r.status===404)naoEncontrado=true;
+  }catch(_){}
+  try{ // 2ª opção: Minha Receita (mesmo formato da BrasilAPI)
+    const r=await fetchJson('https://minhareceita.org/'+d);
+    if(r.ok&&r.json&&r.json.razao_social){const x=normBrasilApi(r.json);x.fonte='Minha Receita';_cnpjCache.set(d,x);return x;}
+    if(r.status===404)naoEncontrado=true;
+  }catch(_){}
+  try{ // último recurso: ReceitaWS (pode ser bloqueada pelo navegador)
+    const r=await fetchJson('https://receitaws.com.br/v1/cnpj/'+d);
+    if(r.ok&&r.json&&r.json.status!=='ERROR'&&r.json.nome){const x=normReceitaWs(r.json);x.fonte='ReceitaWS';_cnpjCache.set(d,x);return x;}
+    if(r.json&&r.json.status==='ERROR'&&/n[ãa]o encontrad|inv[áa]lid|rejeitad/i.test(r.json.message||''))naoEncontrado=true;
+  }catch(_){}
+  if(naoEncontrado)throw _cnpjErr('nao_encontrado','CNPJ não encontrado na Receita — confira os números ou preencha manualmente.');
+  throw _cnpjErr('indisponivel','Não foi possível consultar agora (serviço indisponível ou limite de consultas). Preencha manualmente ou tente de novo em instantes.');
+}
+// Preenche um campo vindo da consulta: só sobrescreve se estiver vazio ou se já tiver sido preenchido automaticamente
+function setLk(id,val,badgeId,soVazios){
+  if(val==null||val==='')return false;
+  const el=document.getElementById(id);if(!el)return false;
+  if(el.value&&(soVazios||!el.classList.contains('auto')))return false;
+  if(el.tagName==='SELECT'){if(![...el.options].some(o=>o.value===val))return false;}
+  el.value=val;el.classList.add('auto');
+  if(badgeId){const b=document.getElementById(badgeId);if(b)b.style.display='inline';}
+  return true;
+}
+function aplicarPrincipal(d,soVazios){
+  setLk('razaoSocial',d.razao,'b-rs',soVazios);
+  setLk('nomeFantasia',d.fantasia,'b-nf',soVazios);
+  setLk('nomeGrupo',d.fantasia||d.razao,'b-ng',true);
+  setLk('dataConst',d.abertura,'b-dc',soVazios);
+  setLk('situacaoCadastral',d.situacao,'b-sit',soVazios);
+  setLk('capitalSocial',d.capital,'b-cap',soVazios);
+  setLk('porte',d.porte,'b-porte',soVazios);
+  setLk('atividadePrincipal',d.atividade,'b-atv',soVazios);
+  setLk('cnaes',d.cnaes.join('\n'),'b-cnaes',soVazios);
+  setLk('localizacao',d.endereco,'b-end',soVazios);
+  setLk('regime',d.regime,'b-reg',true);   // regime só é sugerido quando ainda está vazio
+  const sb=q('#sbx');
+  if(d.socios.length&&(sb.style.display!=='block'||sb.dataset.src==='api')){
+    sb.style.display='block';sb.dataset.src='api';
+    q('#stags').innerHTML=d.socios.map(s=>`<div class="stag">${esc(s)}</div>`).join('');
+  }
+}
+function msgSucesso(r){
+  const ativa=/^ATIVA$/i.test((r.situacao||'').trim());
+  return{tipo:(!r.situacao||ativa)?'ok':'warn',txt:`✓ Dados preenchidos (${r.fonte})`+(r.situacao?` — situação cadastral: ${r.situacao}`:'')+((!ativa&&r.situacao)?' — atenção!':'')};
+}
+let _seqP=0;
+async function consultarPrincipal(soVazios){
+  const d=soDig(g('cnpj'));
+  if(d.length!==14)return;
+  if(!validaCnpj(d)){setStatus('cnpjStatus','err','CNPJ inválido — confira os números.');return;}
+  const my=++_seqP;
+  setStatus('cnpjStatus','load','Consultando dados na Receita Federal...');
+  try{
+    const r=await buscarCnpj(d);
+    if(my!==_seqP||soDig(g('cnpj'))!==d)return;
+    aplicarPrincipal(r,!!soVazios);
+    const m=msgSucesso(r);setStatus('cnpjStatus',m.tipo,m.txt);
+  }catch(e){
+    if(my!==_seqP)return;
+    setStatus('cnpjStatus',e.code==='nao_encontrado'?'warn':'err',e.message);
+  }
+}
+function onCnpjInput(el){
+  const m=maskCnpj(el.value);if(el.value!==m)el.value=m;
+  if(soDig(m).length<14){setStatus('cnpjStatus','','');return;}
+  consultarPrincipal(false);
+}
+
+/* CNPJ de cada filial (um bloco por filial, acompanhando a "Quantidade de filiais") */
+const _seqF={};
+async function consultarFilial(i){
+  const el=document.getElementById('cnpjFil_'+i);if(!el)return;
+  const d=soDig(el.value);
+  if(d.length!==14)return;
+  const st='stFil_'+i;
+  if(!validaCnpj(d)){setStatus(st,'err','CNPJ inválido — confira os números.');return;}
+  if(soDig(g('cnpj'))===d){setStatus(st,'warn','Este CNPJ é o mesmo da matriz.');return;}
+  const total=parseInt(document.getElementById('filialCnpjFields').dataset.count||'0',10);
+  for(let j=1;j<=total;j++){
+    if(j!==i&&soDig(g('cnpjFil_'+j))===d){setStatus(st,'warn','Este CNPJ já foi informado na Filial '+j+'.');return;}
+  }
+  const my=_seqF[i]=(_seqF[i]||0)+1;
+  setStatus(st,'load','Consultando dados na Receita Federal...');
+  try{
+    const r=await buscarCnpj(d);
+    const cur=document.getElementById('cnpjFil_'+i);
+    if(my!==_seqF[i]||!cur||soDig(cur.value)!==d)return;
+    setLk('razaoFil_'+i,r.razao,'b-rsf_'+i,false);
+    setLk('endFil_'+i,r.endereco,null,false);
+    setLk('sitFil_'+i,r.situacao,null,false);
+    const m=msgSucesso(r);setStatus(st,m.tipo,m.txt);
+  }catch(e){
+    if(my!==_seqF[i])return;
+    setStatus(st,e.code==='nao_encontrado'?'warn':'err',e.message);
+  }
+}
+function onCnpjFilInput(i){
+  const el=document.getElementById('cnpjFil_'+i);if(!el)return;
+  const m=maskCnpj(el.value);if(el.value!==m)el.value=m;
+  if(soDig(m).length<14){setStatus('stFil_'+i,'','');return;}
+  consultarFilial(i);
+}
+function renderCnpjFiliais(count){
+  const wrap=document.getElementById('filialCnpjFields');
+  const box=document.getElementById('filialCnpjWrap');
+  const prev=parseInt(wrap.dataset.count||'0',10);
+  const campos=['cnpjFil_','razaoFil_','endFil_','sitFil_'];
+  const keep={};
+  for(let i=1;i<=prev;i++){
+    keep[i]={};
+    campos.forEach(p=>{const el=document.getElementById(p+i);if(el)keep[i][p]={v:el.value,a:el.classList.contains('auto')};});
+    const st=document.getElementById('stFil_'+i);
+    keep[i].st=st?{c:st.className,t:st.textContent}:null;
+  }
+  wrap.dataset.count=count;
+  box.style.display=count>0?'block':'none';
+  if(count===0){wrap.innerHTML='';return;}
+  let html='';
+  for(let i=1;i<=count;i++){
+    const k=keep[i]||{};
+    const val=p=>esc((k[p]||{}).v||'');
+    html+=`<div class="fil-card">
+      <div class="grid g2">
+        <div class="fg"><div class="fl">CNPJ Filial ${i} <span class="badge b-man">Manual</span></div>
+          <input id="cnpjFil_${i}" inputmode="numeric" maxlength="18" placeholder="00.000.000/0001-00" value="${val('cnpjFil_')}" oninput="onCnpjFilInput(${i})">
+          <div class="cnpj-status" id="stFil_${i}"></div></div>
+        <div class="fg"><div class="fl">Razão social <span class="badge b-auto" id="b-rsf_${i}" style="display:none">Auto</span></div>
+          <input id="razaoFil_${i}" placeholder="Preenchida pela consulta do CNPJ" value="${val('razaoFil_')}"></div>
+      </div>
+      <div class="grid g2" style="grid-template-columns:2fr 1fr">
+        <div class="fg"><div class="fl">Endereço</div><input id="endFil_${i}" placeholder="Rua, número — Bairro, Cidade/UF" value="${val('endFil_')}"></div>
+        <div class="fg"><div class="fl">Situação cadastral</div><input id="sitFil_${i}" placeholder="Ex: ATIVA" value="${val('sitFil_')}"></div>
+      </div>
+    </div>`;
+  }
+  wrap.innerHTML=html;
+  for(let i=1;i<=count;i++){
+    const k=keep[i];if(!k)continue;
+    campos.forEach(p=>{const a=k[p];const el=document.getElementById(p+i);if(a&&a.a&&a.v&&el)el.classList.add('auto');});
+    if(k['razaoFil_']&&k['razaoFil_'].a&&k['razaoFil_'].v){const b=document.getElementById('b-rsf_'+i);if(b)b.style.display='inline';}
+    if(k.st&&k.st.t)setStatus('stFil_'+i,(k.st.c.replace('cnpj-status','').trim()),k.st.t);
+  }
+}
+function getFiliaisCnpj(){
+  const total=parseInt((document.getElementById('filialCnpjFields')||{}).dataset?.count||'0',10);
+  const out=[];
+  for(let i=1;i<=total;i++){
+    const c=g('cnpjFil_'+i),r=g('razaoFil_'+i),e=g('endFil_'+i),s=g('sitFil_'+i);
+    if(c||r||e||s)out.push({filial:i,cnpj:c,razao:r,endereco:e,situacao:s});
+  }
+  return out;
+}
+function filialLinha(f){
+  return(f.cnpj||'—')+(f.razao?' — '+f.razao:'')+(f.situacao?' ('+f.situacao+')':'');
 }
 function renderFiliais(count){
   const wrap=document.getElementById('filialFields');
@@ -850,12 +1154,14 @@ function tabelaHonorarios(filiais){
   return`<table class="pd-fin"><thead><tr><th>Unidade</th><th class="num">Honorário</th>${temV13?'<th class="num">13º honorários</th>':''}</tr></thead><tbody>${linhas.join('')}</tbody></table>`;
 }
 
-function gerarResumo(){
+function gerarResumo(sem){   // sem=true → relatório impresso SEM honorários e demais valores financeiros
   const filiais=getFiliaisResumo();
   const honFilialTxt=filiais.map(f=>`Filial ${f.filial}: R$ ${f.honorario||'—'}${f.valor13?' (13º: R$ '+f.valor13+')':''}`).join(' | ');
+  const filCnpj=getFiliaisCnpj();
+  const filCnpjTxt=filCnpj.map(f=>`Filial ${f.filial}: ${esc(filialLinha(f))}`).join(' | ');
   /* ── versão tela ── */
   const secs=[
-    {t:'Dados do grupo',c:[['Nome do grupo',g('nomeGrupo')],['Razão social',g('razaoSocial')],['CNPJ',g('cnpj')],['Data de abertura',g('dataConst')],['Porte',g('porte')],['Capital social',g('capitalSocial')],['Atividade principal',g('atividadePrincipal')],['CNAEs',g('cnaes')],['Localização',g('localizacao')],['Funcionários',g('qtdFunc')],['CNPJs/filiais',g('qtdCNPJ')],['Observações',g('obsGerais')]]},
+    {t:'Dados do grupo',c:[['GRUPO',esc(g('grupoEmp'))],['Nome da empresa',g('nomeGrupo')],['Razão social',g('razaoSocial')],['Nome fantasia',esc(g('nomeFantasia'))],['CNPJ',g('cnpj')],['Situação cadastral',esc(g('situacaoCadastral'))],['Data de abertura',g('dataConst')],['Porte',g('porte')],['Capital social',g('capitalSocial')],['Atividade principal',g('atividadePrincipal')],['CNAEs',g('cnaes')],['Localização',g('localizacao')],['Funcionários',g('qtdFunc')],['Qtd. de filiais',g('qtdFiliais')],['Total de CNPJs',g('qtdCNPJ')],['CNPJ das filiais',filCnpjTxt],['Observações',g('obsGerais')]]},
     {t:'Tributário e contrato',c:[['Regime',g('regime')],['Tipo de serviço',g('tipoServico')],['Honorário'+(filiais.length?' (Matriz)':''),g('honorario')?'R$ '+g('honorario'):''],['Honorários por filial',honFilialTxt],['13º',g('decimoTerceiro')],['Valor 13º honorários (Matriz)',g('valor13')?'R$ '+g('valor13'):''],['Início trabalho',g('inicioTrab')],['Início cobrança',g('inicioCob')],['Contador',g('contadorAtual')],['Executivo',g('executivo')],['CS',g('csResp')],['Próximos passos',g('obsTrib')]]},
     {t:'Perfil comercial',c:[['Perfil',g('perfilCliente')],['Dor',g('dorCliente')],['Expectativa',g('expectativa')],['Meta 3 meses',g('metaCurto')],['Meta 1 ano',g('metaMedio')],['Critérios',g('criterio')],['Curva',g('curva')],['Prob. internos',g('probInt')],['Prob. externos',g('probExt')]]},
     {t:'Contatos',c:[['P-chave operac.',g('pessoaOp')],['P-chave financ.',g('pessoaFin')],['Decisor',g('decisor')],['E-mail',g('email')],['Telefone',g('telefone')],['Indicou',g('indicou')],['Canal',g('canal')]]},
@@ -903,18 +1209,23 @@ function gerarResumo(){
   </div>
 
   ${sec('Dados cadastrais',2,
-    [rowH('Atividade principal',g('atividadePrincipal')),row('CNAEs',g('cnaes')?g('cnaes').replace(/\n/g,' | '):''),rowH('Endereço',g('localizacao')),
+    [rowH('GRUPO',esc(g('grupoEmp'))),row('Nome fantasia',esc(g('nomeFantasia'))),
+     rowH('Atividade principal',g('atividadePrincipal')),row('CNAEs',g('cnaes')?g('cnaes').replace(/\n/g,' | '):''),rowH('Endereço',g('localizacao')),
+     row('Situação cadastral',esc(g('situacaoCadastral'))),
      row('Data de abertura',g('dataConst')),row('Porte',g('porte')),
-     row('Capital social',g('capitalSocial')),row('Qtd. CNPJs/filiais',g('qtdCNPJ')),
+     sem?'':row('Capital social',g('capitalSocial')),row('Qtd. filiais',g('qtdFiliais')),row('Total de CNPJs',g('qtdCNPJ')),
      row('Qtd. funcionários',g('qtdFunc'))])}
+
+  ${sec('Filiais',1,
+    filCnpj.map(f=>row('Filial '+f.filial,esc(filialLinha(f))+(f.endereco?'<br><span style="color:var(--text-m)">'+esc(f.endereco)+'</span>':''))))}
 
   ${secRaw('Serviços contratados',pdfChips(g('tipoServico')))}
 
-  ${secRaw('Honorários',tabelaHonorarios(filiais))}
+  ${sem?'':secRaw('Honorários',tabelaHonorarios(filiais))}
 
   ${sec('Contrato',2,
-    [row('Início do trabalho',g('inicioTrab')),row('Início da cobrança',g('inicioCob')),
-     row('13º salário',g('decimoTerceiro')),row('Contador atual',g('contadorAtual'))])}
+    [row('Início do trabalho',g('inicioTrab')),sem?'':row('Início da cobrança',g('inicioCob')),
+     sem?'':row('13º salário',g('decimoTerceiro')),row('Contador atual',g('contadorAtual'))])}
 
   ${sec('Responsáveis',2,
     [rowH('Executivo de vendas',g('executivo')),rowH('Sucesso do cliente',g('csResp')),
@@ -951,19 +1262,21 @@ function gerarResumo(){
   go('resumo',q('[data-s=resumo]'));
 }
 
-function imprimir(){
-  if(!q('#print-doc').innerHTML.trim())gerarResumo();
+function imprimir(sem){
+  gerarResumo(!!sem);   // sempre regera, para respeitar a versão escolhida (com ou sem valores)
   setTimeout(()=>window.print(),200);
 }
 
-function copiar(){
+function copiar(sem){
   const filiais=getFiliaisResumo();
   const linhasFiliais=filiais.map(f=>'Honorário Filial '+f.filial+': '+(f.honorario?'R$ '+f.honorario:'')+(f.valor13?' (13º: R$ '+f.valor13+')':''));
   const linhas=['FICHA COMERCIAL — SOUSA & COUTO','Data: '+new Date().toLocaleDateString('pt-BR'),'─'.repeat(48),'',
-    'DADOS DO GRUPO','Nome: '+g('nomeGrupo'),'CNPJ: '+g('cnpj'),'Razão social: '+g('razaoSocial'),
-    'Porte: '+g('porte'),'Atividade: '+g('atividadePrincipal'),'Endereço: '+g('localizacao'),'',
-    'TRIBUTÁRIO','Regime: '+g('regime'),'Serviço: '+g('tipoServico'),'Honorário: R$ '+g('honorario'),
-    'Valor 13º: '+(g('valor13')?'R$ '+g('valor13'):''),...linhasFiliais,
+    'DADOS DO GRUPO','GRUPO: '+g('grupoEmp'),'Empresa: '+g('nomeGrupo'),'CNPJ: '+g('cnpj'),'Razão social: '+g('razaoSocial'),
+    'Nome fantasia: '+g('nomeFantasia'),'Situação cadastral: '+g('situacaoCadastral'),
+    'Porte: '+g('porte'),'Atividade: '+g('atividadePrincipal'),'Endereço: '+g('localizacao'),
+    ...getFiliaisCnpj().map(f=>'CNPJ Filial '+f.filial+': '+filialLinha(f).replace(/^—$/,'')),'',
+    'TRIBUTÁRIO','Regime: '+g('regime'),'Serviço: '+g('tipoServico'),
+    ...(sem?[]:['Honorário: R$ '+g('honorario'),'Valor 13º: '+(g('valor13')?'R$ '+g('valor13'):''),...linhasFiliais]),
     'Início: '+g('inicioTrab'),'Executivo: '+g('executivo'),'CS: '+g('csResp'),'',
     'COMERCIAL','Perfil: '+g('perfilCliente'),'Dor: '+g('dorCliente'),
     'Meta 3 meses: '+g('metaCurto'),'Meta 1 ano: '+g('metaMedio'),'Curva: '+g('curva'),'',
@@ -986,6 +1299,11 @@ function reset(){
   document.getElementById('honLbl').textContent='(R$)';
   q('#sbx').style.display='none';q('#al').className='al';
   document.getElementById('bm-qcnpj').style.display='inline';
+  document.getElementById('filialCnpjWrap').style.display='none';
+  document.getElementById('filialCnpjFields').innerHTML='';
+  document.getElementById('filialCnpjFields').dataset.count='0';
+  setStatus('cnpjStatus','','');_seqP++;
+  delete q('#sbx').dataset.src;
   fi.value='';go('upload',q('[data-s=upload]'));
 }
 function toast(msg){const el=q('#toast');el.textContent=msg;el.classList.add('show');setTimeout(()=>el.classList.remove('show'),3000);}
