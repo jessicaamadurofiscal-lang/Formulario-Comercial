@@ -349,7 +349,7 @@ input.auto,select.auto,textarea.auto{background:var(--green-bg);border-color:var
     <div class="grid g1"><div class="fg"><div class="fl">CNAEs / atividades <span class="badge b-auto" id="b-cnaes" style="display:none">Auto</span></div><textarea id="cnaes" placeholder="Atividades econômicas (principal e secundárias) — extraídas do cartão CNPJ" style="min-height:80px"></textarea></div></div>
     <div class="grid g2">
       <div class="fg"><div class="fl">Situação cadastral <span class="badge b-auto" id="b-sit" style="display:none">Auto</span></div><input id="situacaoCadastral" placeholder="Preenchida pela consulta do CNPJ"></div>
-      <div class="fg"><div class="fl">Qtd. funcionários <span class="badge b-man">Manual</span></div><input type="number" id="qtdFunc" placeholder="0"></div>
+      <div class="fg"><div class="fl">Qtd. funcionários <span id="funcLbl"></span> <span class="badge b-man">Manual</span></div><input type="number" id="qtdFunc" min="0" placeholder="0"></div>
     </div>
     <div class="grid g2">
       <div class="fg"><div class="fl">Quantidade de filiais <span class="badge b-man">Manual</span></div><input type="number" id="qtdFiliais" min="0" max="50" placeholder="0" oninput="syncFromFiliais()"><div class="hint">Abre um campo de CNPJ para cada filial.</div></div>
@@ -808,6 +808,7 @@ function toggleFilial(){
   else if(String(raw).trim()===''&&qf.value!=='')qf.value='';
   document.getElementById('filialWrap').style.display=numFiliais>0?'block':'none';
   document.getElementById('honLbl').textContent=numFiliais>0?'(Matriz) (R$)':'(R$)';
+  document.getElementById('funcLbl').textContent=numFiliais>0?'(matriz)':'';
   renderFiliais(numFiliais);
   renderCnpjFiliais(numFiliais);
 }
@@ -1036,7 +1037,7 @@ function renderCnpjFiliais(count){
   const wrap=document.getElementById('filialCnpjFields');
   const box=document.getElementById('filialCnpjWrap');
   const prev=parseInt(wrap.dataset.count||'0',10);
-  const campos=['cnpjFil_','razaoFil_','endFil_','sitFil_'];
+  const campos=['cnpjFil_','razaoFil_','endFil_','sitFil_','empFil_'];
   const keep={};
   for(let i=1;i<=prev;i++){
     keep[i]={};
@@ -1059,9 +1060,10 @@ function renderCnpjFiliais(count){
         <div class="fg"><div class="fl">Razão social <span class="badge b-auto" id="b-rsf_${i}" style="display:none">Auto</span></div>
           <input id="razaoFil_${i}" placeholder="Preenchida pela consulta do CNPJ" value="${val('razaoFil_')}"></div>
       </div>
-      <div class="grid g2" style="grid-template-columns:2fr 1fr">
+      <div class="grid g3" style="grid-template-columns:2fr 1fr 1fr">
         <div class="fg"><div class="fl">Endereço</div><input id="endFil_${i}" placeholder="Rua, número — Bairro, Cidade/UF" value="${val('endFil_')}"></div>
         <div class="fg"><div class="fl">Situação cadastral</div><input id="sitFil_${i}" placeholder="Ex: ATIVA" value="${val('sitFil_')}"></div>
+        <div class="fg"><div class="fl">Funcionários <span class="badge b-man">Manual</span></div><input type="number" min="0" id="empFil_${i}" placeholder="0" value="${val('empFil_')}"></div>
       </div>
     </div>`;
   }
@@ -1077,13 +1079,18 @@ function getFiliaisCnpj(){
   const total=parseInt((document.getElementById('filialCnpjFields')||{}).dataset?.count||'0',10);
   const out=[];
   for(let i=1;i<=total;i++){
-    const c=g('cnpjFil_'+i),r=g('razaoFil_'+i),e=g('endFil_'+i),s=g('sitFil_'+i);
-    if(c||r||e||s)out.push({filial:i,cnpj:c,razao:r,endereco:e,situacao:s});
+    const c=g('cnpjFil_'+i),r=g('razaoFil_'+i),e=g('endFil_'+i),s=g('sitFil_'+i),fn=g('empFil_'+i);
+    if(c||r||e||s||fn)out.push({filial:i,cnpj:c,razao:r,endereco:e,situacao:s,func:fn});
   }
   return out;
 }
 function filialLinha(f){
-  return(f.cnpj||'—')+(f.razao?' — '+f.razao:'')+(f.situacao?' ('+f.situacao+')':'');
+  return(f.cnpj||'—')+(f.razao?' — '+f.razao:'')+(f.situacao?' ('+f.situacao+')':'')+(f.func?' — '+f.func+' funcionário'+(String(f.func)==='1'?'':'s'):'');
+}
+// Total de funcionários (matriz + filiais) — só faz sentido quando alguma filial informou o seu
+function totalFuncionarios(filiais){
+  if(!filiais.some(f=>f.func))return'';
+  return String((parseInt(g('qtdFunc'),10)||0)+filiais.reduce((s,f)=>s+(parseInt(f.func,10)||0),0));
 }
 // Sócios que aparecem na tela (vindos do PDF ou da consulta do CNPJ) — usados no relatório
 function getSocios(){
@@ -1243,7 +1250,7 @@ function gerarResumo(sem){   // sem=true → relatório impresso SEM honorários
   const socios=getSocios();
   /* ── versão tela ── */
   const secs=[
-    {t:'Dados do grupo',c:[['GRUPO',esc(g('grupoEmp'))],['Nome da empresa',g('nomeGrupo')],['Razão social',g('razaoSocial')],['Nome fantasia',esc(g('nomeFantasia'))],['CNPJ',g('cnpj')],['Situação cadastral',esc(g('situacaoCadastral'))],['Data de abertura',g('dataConst')],['Porte',g('porte')],['Capital social',g('capitalSocial')],['Atividade principal',g('atividadePrincipal')],['CNAEs',g('cnaes')],['Localização',g('localizacao')],['Funcionários',g('qtdFunc')],['Qtd. de filiais',g('qtdFiliais')],['Total de CNPJs',g('qtdCNPJ')],['CNPJ das filiais',filCnpjTxt],['Sócios',esc(socios.join(' | '))],['Observações',g('obsGerais')]]},
+    {t:'Dados do grupo',c:[['GRUPO',esc(g('grupoEmp'))],['Nome da empresa',g('nomeGrupo')],['Razão social',g('razaoSocial')],['Nome fantasia',esc(g('nomeFantasia'))],['CNPJ',g('cnpj')],['Situação cadastral',esc(g('situacaoCadastral'))],['Data de abertura',g('dataConst')],['Porte',g('porte')],['Capital social',g('capitalSocial')],['Atividade principal',g('atividadePrincipal')],['CNAEs',g('cnaes')],['Localização',g('localizacao')],['Funcionários'+(filCnpj.length?' (matriz)':''),g('qtdFunc')],['Total de funcionários',totalFuncionarios(filCnpj)],['Qtd. de filiais',g('qtdFiliais')],['Total de CNPJs',g('qtdCNPJ')],['CNPJ das filiais',filCnpjTxt],['Sócios',esc(socios.join(' | '))],['Observações',g('obsGerais')]]},
     {t:'Tributário e contrato',c:[['Regime',g('regime')],['Tipo de serviço',g('tipoServico')],['Honorário'+(filiais.length?' (Matriz)':''),g('honorario')?'R$ '+g('honorario'):''],['Honorários por filial',honFilialTxt],['13º',g('decimoTerceiro')],['Valor 13º honorários (Matriz)',g('valor13')?'R$ '+g('valor13'):''],['Início trabalho',g('inicioTrab')],['Início cobrança',g('inicioCob')],['Contador',g('contadorAtual')],['Executivo',g('executivo')],['CS',g('csResp')],['Próximos passos',g('obsTrib')]]},
     {t:'Perfil comercial',c:[['Perfil',g('perfilCliente')],['Dor',g('dorCliente')],['Expectativa',g('expectativa')],['Meta 3 meses',g('metaCurto')],['Meta 1 ano',g('metaMedio')],['Critérios',g('criterio')],['Curva',g('curva')],['Prob. internos',g('probInt')],['Prob. externos',g('probExt')]]},
     {t:'Contatos',c:[['P-chave operac.',g('pessoaOp')],['P-chave financ.',g('pessoaFin')],['Decisor',g('decisor')],['E-mail',g('email')],['Telefone',g('telefone')],['Indicou',g('indicou')],['Canal',g('canal')]]},
@@ -1296,7 +1303,7 @@ function gerarResumo(sem){   // sem=true → relatório impresso SEM honorários
      row('Situação cadastral',esc(g('situacaoCadastral'))),
      row('Data de abertura',g('dataConst')),row('Porte',g('porte')),
      sem?'':row('Capital social',g('capitalSocial')),row('Qtd. filiais',g('qtdFiliais')),row('Total de CNPJs',g('qtdCNPJ')),
-     row('Qtd. funcionários',g('qtdFunc'))])}
+     row('Qtd. funcionários'+(filCnpj.length?' (matriz)':''),g('qtdFunc')),row('Total de funcionários',totalFuncionarios(filCnpj))])}
 
   ${sec('Quadro societário',1,
     socios.map((s,i)=>row('Sócio '+(i+1),esc(s))))}
@@ -1359,6 +1366,8 @@ function copiar(sem){
     'DADOS DO GRUPO','GRUPO: '+g('grupoEmp'),'Empresa: '+g('nomeGrupo'),'CNPJ: '+g('cnpj'),'Razão social: '+g('razaoSocial'),
     'Nome fantasia: '+g('nomeFantasia'),'Situação cadastral: '+g('situacaoCadastral'),
     'Porte: '+g('porte'),'Atividade: '+g('atividadePrincipal'),'Endereço: '+g('localizacao'),
+    'Funcionários'+(getFiliaisCnpj().length?' (matriz)':'')+': '+g('qtdFunc'),
+    'Total de funcionários: '+totalFuncionarios(getFiliaisCnpj()),
     'Sócios: '+getSocios().join('; '),
     ...getFiliaisCnpj().map(f=>'CNPJ Filial '+f.filial+': '+filialLinha(f).replace(/^—$/,'')),'',
     'TRIBUTÁRIO','Regime: '+g('regime'),'Serviço: '+g('tipoServico'),
@@ -1383,6 +1392,7 @@ function reset(){
   document.getElementById('filialFields').innerHTML='';
   document.getElementById('filialFields').dataset.count='0';
   document.getElementById('honLbl').textContent='(R$)';
+  document.getElementById('funcLbl').textContent='';
   q('#sbx').style.display='none';q('#al').className='al';
   document.getElementById('bm-qcnpj').style.display='inline';
   document.getElementById('filialCnpjWrap').style.display='none';
