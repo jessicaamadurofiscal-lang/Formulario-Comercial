@@ -123,6 +123,11 @@ input.auto,select.auto,textarea.auto{background:var(--green-bg);border-color:var
 .cnpj-status.ok{color:var(--green)}
 .cnpj-status.warn{color:var(--amber)}
 .cnpj-status.err{color:#A32D2D}
+.pasta-box{border:1px solid var(--border-m);border-left:3px solid var(--navy);border-radius:var(--r);padding:12px;margin:14px 0;background:var(--silver-xl)}
+.pasta-box details{margin-top:10px}
+.pasta-box summary{cursor:pointer;font-size:12px;color:var(--text-s)}
+.pasta-row{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:8px}
+.pasta-row input[type=text]{flex:1;min-width:200px}
 .fil-card{border:1px solid var(--border-m);border-left:3px solid var(--navy);border-radius:var(--r);padding:12px 12px 0;margin-bottom:12px;background:var(--silver-xl)}
 
 /* ── CHIPS ── */
@@ -518,7 +523,7 @@ input.auto,select.auto,textarea.auto{background:var(--green-bg);border-color:var
     <div class="grid g1"><div class="fg"><div class="fl">Observações de onboarding <span class="badge b-man">Manual</span></div><textarea id="obsOp" placeholder="Detalhes para a equipe de implementação..."></textarea></div></div>
     <div class="actions">
       <button class="btn" onclick="go('contatos',q('[data-s=contatos]'))">← Voltar</button>
-      <button class="btn btn-navy" onclick="gerarResumo()">✓ Gerar resumo &amp; relatório</button>
+      <button class="btn btn-navy" onclick="gerarResumo();autoPasta()">✓ Gerar resumo &amp; relatório</button>
     </div>
   </div>
 </div>
@@ -538,6 +543,27 @@ input.auto,select.auto,textarea.auto{background:var(--green-bg);border-color:var
 
     <!-- DOCUMENTO DE IMPRESSÃO (gerado por JS, oculto na tela) -->
     <div id="print-doc"></div>
+
+    <!-- PASTA DO CLIENTE NO SERVIDOR -->
+    <div class="pasta-box" id="pastaBox">
+      <div class="fl">📁 Pasta do cliente no servidor</div>
+      <div class="hint">Cria uma pasta com o nome da empresa dentro da pasta de clientes do escritório. Na primeira vez, escolha a pasta <b>\\srv-dc\SOUSA_E_COUTO\NP2\DEP_CONFERENCIA\SUCESSO\RECEPCAO</b>; depois o navegador lembra.</div>
+      <div class="pasta-row">
+        <input type="text" id="pastaNome" data-pasta="1" placeholder="Nome da pasta (vem do campo Nome da empresa)" oninput="this.dataset.manual='1'">
+        <button class="btn btn-navy btn-sm" id="btnPasta" onclick="criarPasta()">Criar pasta no servidor</button>
+        <button class="btn btn-sm" onclick="escolherPasta()">Trocar pasta de clientes</button>
+      </div>
+      <div class="pasta-row"><label style="font-size:12px;display:flex;gap:6px;align-items:center;cursor:pointer"><input type="checkbox" id="pastaAuto" onchange="salvaPrefPasta()"> Criar a pasta automaticamente ao clicar em “Gerar resumo &amp; relatório”</label></div>
+      <div class="cnpj-status" id="pastaStatus" style="margin-top:8px"></div>
+      <details id="pastaBatBox">
+        <summary>Navegador sem suporte (ou sem acesso ao servidor)? Gerar arquivo .bat</summary>
+        <div class="hint" style="margin-top:6px">Digite o caminho da pasta de clientes no servidor (já vem preenchido com <b>\\srv-dc\SOUSA_E_COUTO\NP2\DEP_CONFERENCIA\SUCESSO\RECEPCAO</b>). Depois é só abrir o arquivo baixado, no computador do escritório.</div>
+        <div class="pasta-row">
+          <input type="text" id="pastaCaminho" data-keep="1" placeholder="\\srv-dc\SOUSA_E_COUTO\NP2\DEP_CONFERENCIA\SUCESSO\RECEPCAO" oninput="salvaPrefPasta()">
+          <button class="btn btn-sm" onclick="baixarBat()">Baixar .bat</button>
+        </div>
+      </details>
+    </div>
 
     <div class="actions">
       <div class="btn-grp">
@@ -1242,7 +1268,8 @@ function tabelaHonorarios(filiais){
   return`<table class="pd-fin"><thead><tr><th>Unidade</th><th class="num">Honorário</th>${temV13?'<th class="num">13º honorários</th>':''}</tr></thead><tbody>${linhas.join('')}</tbody></table>`;
 }
 
-function gerarResumo(sem){   // sem=true → relatório impresso SEM honorários e demais valores financeiros
+function gerarResumo(sem){
+  syncPastaNome();   // sem=true → relatório impresso SEM honorários e demais valores financeiros
   const filiais=getFiliaisResumo();
   const honFilialTxt=filiais.map(f=>`Filial ${f.filial}: R$ ${f.honorario||'—'}${f.valor13?' (13º: R$ '+f.valor13+')':''}`).join(' | ');
   const filCnpj=getFiliaisCnpj();
@@ -1381,8 +1408,109 @@ function copiar(sem){
   navigator.clipboard.writeText(linhas).then(()=>{toast('✓ Dados copiados');const b=q('#bcopy');b.textContent='✓ Copiado!';setTimeout(()=>b.textContent='Copiar dados',2500);});
 }
 
+// ══ PASTA DO CLIENTE NO SERVIDOR ══
+const PASTA_PADRAO='\\\\srv-dc\\SOUSA_E_COUTO\\NP2\\DEP_CONFERENCIA\\SUCESSO\\RECEPCAO';   // pasta de clientes (recepção) no servidor do escritório
+// Chrome/Edge permitem que o site crie pastas numa pasta que a pessoa autoriza (File System Access API).
+// A pasta de clientes escolhida fica guardada no navegador (IndexedDB); o .bat é a alternativa para outros navegadores.
+function nomePastaSeguro(s){
+  let n=String(s||'').replace(/[\\\/:*?"<>|\u0000-\u001f]/g,' ').replace(/\s+/g,' ').trim().replace(/[. ]+$/,'');
+  if(/^(con|prn|aux|nul|com\d|lpt\d)$/i.test(n))n+=' -';
+  return n.slice(0,120).trim();
+}
+function setPastaStatus(msg,cls){const el=document.getElementById('pastaStatus');el.textContent=msg;el.className='cnpj-status '+(cls||'');}
+function syncPastaNome(){
+  const el=document.getElementById('pastaNome');if(!el)return;
+  if(el.dataset.manual==='1'&&el.value.trim())return;   // o que a pessoa digitou manda
+  el.value=nomePastaSeguro(g('nomeGrupo')||g('razaoSocial'));
+}
+function _idb(){return new Promise((res,rej)=>{const r=indexedDB.open('ficha_sc',1);r.onupgradeneeded=()=>r.result.createObjectStore('kv');r.onsuccess=()=>res(r.result);r.onerror=()=>rej(r.error);});}
+async function idbGet(k){try{const db=await _idb();return await new Promise((res,rej)=>{const r=db.transaction('kv').objectStore('kv').get(k);r.onsuccess=()=>res(r.result);r.onerror=()=>rej(r.error);});}catch(e){return null;}}
+async function idbSet(k,v){try{const db=await _idb();await new Promise((res,rej)=>{const t=db.transaction('kv','readwrite');t.objectStore('kv').put(v,k);t.oncomplete=res;t.onerror=()=>rej(t.error);});}catch(e){}}
+function temApiPasta(){return typeof window.showDirectoryPicker==='function';}
+async function obterRaiz(forcarEscolha){
+  let h=forcarEscolha?null:await idbGet('pastaRaiz');
+  if(h&&h.queryPermission){
+    let p=await h.queryPermission({mode:'readwrite'});
+    if(p!=='granted')p=await h.requestPermission({mode:'readwrite'});
+    if(p!=='granted')h=null;
+  }else h=null;
+  if(!h){
+    h=await window.showDirectoryPicker({mode:'readwrite',id:'fichaClientes'});
+    await idbSet('pastaRaiz',h);
+  }
+  return h;
+}
+async function escolherPasta(){
+  if(!temApiPasta()){setPastaStatus('Este navegador não deixa o site criar pastas. Use o Chrome ou o Edge, ou gere o arquivo .bat abaixo.','warn');document.getElementById('pastaBatBox').open=true;return;}
+  try{const r=await obterRaiz(true);setPastaStatus('Pasta de clientes definida: “'+r.name+'”.','ok');}
+  catch(e){setPastaStatus(e&&e.name==='AbortError'?'Nenhuma pasta escolhida.':'Não foi possível acessar a pasta: '+(e&&e.message||e),e&&e.name==='AbortError'?'warn':'err');}
+}
+const _norm=s=>String(s).normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/[^a-z0-9]+/g,' ').trim();
+async function criarPasta(auto){
+  syncPastaNome();
+  const nome=nomePastaSeguro(g('pastaNome'));
+  if(!nome){setPastaStatus('Informe o nome da empresa (ou o nome da pasta) para criar a pasta.','err');return;}
+  if(!temApiPasta()){setPastaStatus('Este navegador não deixa o site criar pastas no servidor. Use o Chrome ou o Edge, ou gere o arquivo .bat abaixo.','warn');document.getElementById('pastaBatBox').open=true;return;}
+  setPastaStatus('Criando pasta…','load');
+  try{
+    const raiz=await obterRaiz(false);
+    // já existe uma pasta com esse nome? (o Windows não diferencia maiúsculas de minúsculas)
+    let existe=false;
+    try{await raiz.getDirectoryHandle(nome);existe=true;}catch(e){if(!e||e.name!=='NotFoundError')throw e;}
+    if(existe){setPastaStatus('A pasta “'+nome+'” já existe em “'+raiz.name+'”. Nada foi alterado.','warn');return;}
+    // pastas parecidas (ex.: mesma empresa cadastrada com outro sufixo)
+    const alvo=_norm(nome),parecidas=[];
+    for await(const ent of raiz.values()){
+      if(ent.kind!=='directory')continue;
+      const n=_norm(ent.name);
+      if(n.length>=4&&alvo.length>=4&&(n.startsWith(alvo)||alvo.startsWith(n)))parecidas.push(ent.name);
+      if(parecidas.length>=3)break;
+    }
+    if(parecidas.length&&!confirm('Já existe pasta parecida no servidor:\n\n'+parecidas.join('\n')+'\n\nCriar mesmo assim a pasta “'+nome+'”?')){
+      setPastaStatus('Não criada: já existe pasta parecida ('+parecidas.join('; ')+').','warn');return;
+    }
+    await raiz.getDirectoryHandle(nome,{create:true});
+    setPastaStatus('✓ Pasta criada: “'+raiz.name+'” › “'+nome+'”.','ok');
+  }catch(e){
+    const n=e&&e.name;
+    setPastaStatus(n==='AbortError'?'Nenhuma pasta de clientes escolhida — nada foi criado.':n==='NotAllowedError'?'Sem permissão para gravar nessa pasta. Clique em “Trocar pasta de clientes” e autorize o acesso.':'Não foi possível criar a pasta: '+(e&&e.message||e),n==='AbortError'?'warn':'err');
+  }
+}
+function autoPasta(){
+  const cb=document.getElementById('pastaAuto');
+  if(cb&&cb.checked)criarPasta(true).catch(()=>{});
+}
+function salvaPrefPasta(){
+  try{localStorage.setItem('ficha_pasta_auto',document.getElementById('pastaAuto').checked?'1':'0');localStorage.setItem('ficha_pasta_caminho',g('pastaCaminho'));}catch(e){}
+}
+function montaBat(caminho,nome){
+  const base=String(caminho).trim().replace(/[\\\/]+$/,'');
+  const alvo=(base+'\\'+nome).replace(/%/g,'%%');
+  return ['chcp 65001 >nul','@echo off','set "PASTA='+alvo+'"',
+    'if exist "%PASTA%" goto existe','mkdir "%PASTA%"','if errorlevel 1 goto erro',
+    'echo Pasta criada com sucesso.','goto fim',':existe','echo A pasta ja existe. Nada foi alterado.','goto fim',
+    ':erro','echo ERRO: nao foi possivel criar a pasta. Verifique o acesso ao servidor.',':fim','pause',''].join('\r\n');
+}
+function baixarBat(){
+  syncPastaNome();
+  const nome=nomePastaSeguro(g('pastaNome')),cam=g('pastaCaminho').trim();
+  if(!nome){setPastaStatus('Informe o nome da empresa (ou o nome da pasta).','err');return;}
+  if(!cam){setPastaStatus('Digite o caminho da pasta de clientes no servidor (ex.: \\\\SERVIDOR\\Clientes).','err');document.getElementById('pastaCaminho').focus();return;}
+  salvaPrefPasta();
+  const slug=_norm(nome).replace(/ /g,'-').slice(0,40)||'cliente';
+  const blob=new Blob([montaBat(cam,nome)],{type:'application/octet-stream'});
+  const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='criar-pasta-'+slug+'.bat';
+  document.body.appendChild(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove();},500);
+  setPastaStatus('Arquivo baixado. Abra-o no computador do escritório para criar a pasta (o navegador pode pedir confirmação para manter o .bat).','ok');
+}
+(function(){try{
+  document.getElementById('pastaAuto').checked=localStorage.getItem('ficha_pasta_auto')==='1';
+  document.getElementById('pastaCaminho').value=localStorage.getItem('ficha_pasta_caminho')||PASTA_PADRAO;
+}catch(e){}})();
+
 function reset(){
-  qa('input:not([type=hidden]):not([type=file]):not([type=checkbox]),select,textarea').forEach(el=>{el.value='';el.classList.remove('auto')});
+  qa('input:not([type=hidden]):not([type=file]):not([type=checkbox]):not([data-keep]),select,textarea').forEach(el=>{el.value='';el.classList.remove('auto');delete el.dataset.manual});
+  document.getElementById('pastaStatus').textContent='';document.getElementById('pastaStatus').className='cnpj-status';
   qa('[id^="b-"]').forEach(el=>el.style.display='none');
   qa('.chip').forEach(c=>c.classList.remove('sel'));
   qa('#tsPanel input:checked').forEach(c=>c.checked=false);
