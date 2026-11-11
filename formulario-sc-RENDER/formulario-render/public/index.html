@@ -547,11 +547,12 @@ input.auto,select.auto,textarea.auto{background:var(--green-bg);border-color:var
     <!-- PASTA DO CLIENTE NO SERVIDOR -->
     <div class="pasta-box" id="pastaBox">
       <div class="fl">📁 Pasta do cliente no servidor</div>
-      <div class="hint">Cria uma pasta com o nome da empresa dentro da pasta de clientes do escritório. Na primeira vez, escolha a pasta <b>\\srv-dc\SOUSA_E_COUTO\NP2\DEP_CONFERENCIA\SUCESSO\RECEPCAO</b>; depois o navegador lembra.</div>
+      <div class="hint">Cria uma pasta com o nome da empresa e, dentro dela, as 6 subpastas padrão (1.DEPARTAMENTO_LEGALIZACAO a 6.DEPARTAMENTO_COMERCIAL). Se a pasta já existir, só completa as subpastas que faltam. O botão “Salvar PDF sem valores” grava o relatório (sem honorários) direto na subpasta 6.DEPARTAMENTO_COMERCIAL. Na primeira vez, escolha a pasta <b>\\srv-dc\SOUSA_E_COUTO\NP2\DEP_CONFERENCIA\SUCESSO\RECEPCAO</b>; depois o navegador lembra.</div>
       <div class="pasta-row">
         <input type="text" id="pastaNome" data-pasta="1" placeholder="Nome da pasta (vem do campo Nome da empresa)" oninput="this.dataset.manual='1'">
         <button class="btn btn-navy btn-sm" id="btnPasta" onclick="criarPasta()">Criar pasta no servidor</button>
         <button class="btn btn-sm" onclick="escolherPasta()">Trocar pasta de clientes</button>
+        <button class="btn btn-navy btn-sm" id="btnPdfPasta" onclick="salvarPdfComercial()">💾 Salvar PDF sem valores em 6.DEPARTAMENTO_COMERCIAL</button>
       </div>
       <div class="pasta-row"><label style="font-size:12px;display:flex;gap:6px;align-items:center;cursor:pointer"><input type="checkbox" id="pastaAuto" onchange="salvaPrefPasta()"> Criar a pasta automaticamente ao clicar em “Gerar resumo &amp; relatório”</label></div>
       <div class="cnpj-status" id="pastaStatus" style="margin-top:8px"></div>
@@ -575,6 +576,7 @@ input.auto,select.auto,textarea.auto{background:var(--green-bg);border-color:var
         <button class="btn btn-sm" onclick="copiar(true)">Copiar sem valores</button>
         <button class="btn btn-primary btn-sm" onclick="imprimir()">PDF completo (com valores)</button>
         <button class="btn btn-navy btn-sm" onclick="imprimir(true)">PDF sem valores</button>
+        <button class="btn btn-navy btn-sm" onclick="salvarPdfComercial()">💾 Salvar PDF sem valores na pasta 6.COMERCIAL</button>
       </div>
     </div>
   </div>
@@ -1410,6 +1412,15 @@ function copiar(sem){
 
 // ══ PASTA DO CLIENTE NO SERVIDOR ══
 const PASTA_PADRAO='\\\\srv-dc\\SOUSA_E_COUTO\\NP2\\DEP_CONFERENCIA\\SUCESSO\\RECEPCAO';   // pasta de clientes (recepção) no servidor do escritório
+const SUBPASTAS=['1.DEPARTAMENTO_LEGALIZACAO','2.DEPARTAMENTO_PESSOAL','3.DEPARTAMENTO_FISCAL','4.DEPARTAMENTO_CONTABIL','5.DEPARTAMENTO_ONBOARDING','6.DEPARTAMENTO_COMERCIAL'];   // padrão de subpastas de cada empresa
+async function garantirSubpastas(dir){   // cria só as que faltam; devolve os nomes criados
+  const criadas=[];
+  for(const n of SUBPASTAS){
+    try{await dir.getDirectoryHandle(n);}
+    catch(e){if(!e||e.name!=='NotFoundError')throw e;await dir.getDirectoryHandle(n,{create:true});criadas.push(n);}
+  }
+  return criadas;
+}
 // Chrome/Edge permitem que o site crie pastas numa pasta que a pessoa autoriza (File System Access API).
 // A pasta de clientes escolhida fica guardada no navegador (IndexedDB); o .bat é a alternativa para outros navegadores.
 function nomePastaSeguro(s){
@@ -1446,6 +1457,29 @@ async function escolherPasta(){
   catch(e){setPastaStatus(e&&e.name==='AbortError'?'Nenhuma pasta escolhida.':'Não foi possível acessar a pasta: '+(e&&e.message||e),e&&e.name==='AbortError'?'warn':'err');}
 }
 const _norm=s=>String(s).normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/[^a-z0-9]+/g,' ').trim();
+// Garante a pasta da empresa (e as subpastas) dentro da pasta de clientes.
+// Devolve {dir, criada, faltantes} ou {recusada:[pastas parecidas]} se a pessoa preferir não criar.
+async function prepararPastaEmpresa(raiz,nome){
+  let dir=null;
+  try{dir=await raiz.getDirectoryHandle(nome);}catch(e){if(!e||e.name!=='NotFoundError')throw e;}   // o Windows não diferencia maiúsculas de minúsculas
+  if(dir)return{dir,criada:false,faltantes:await garantirSubpastas(dir)};
+  // pastas parecidas (ex.: mesma empresa cadastrada com outro sufixo)
+  const alvo=_norm(nome),parecidas=[];
+  for await(const ent of raiz.values()){
+    if(ent.kind!=='directory')continue;
+    const n=_norm(ent.name);
+    if(n.length>=4&&alvo.length>=4&&(n.startsWith(alvo)||alvo.startsWith(n)))parecidas.push(ent.name);
+    if(parecidas.length>=3)break;
+  }
+  if(parecidas.length&&!confirm('Já existe pasta parecida no servidor:\n\n'+parecidas.join('\n')+'\n\nCriar mesmo assim a pasta “'+nome+'”?'))return{recusada:parecidas};
+  dir=await raiz.getDirectoryHandle(nome,{create:true});
+  await garantirSubpastas(dir);
+  return{dir,criada:true,faltantes:[]};
+}
+function erroPasta(e,acao){
+  const n=e&&e.name;
+  setPastaStatus(n==='AbortError'?'Nenhuma pasta de clientes escolhida — nada foi '+acao+'.':n==='NotAllowedError'?'Sem permissão para gravar nessa pasta. Clique em “Trocar pasta de clientes” e autorize o acesso.':'Não foi possível concluir: '+(e&&e.message||e),n==='AbortError'?'warn':'err');
+}
 async function criarPasta(auto){
   syncPastaNome();
   const nome=nomePastaSeguro(g('pastaNome'));
@@ -1454,27 +1488,83 @@ async function criarPasta(auto){
   setPastaStatus('Criando pasta…','load');
   try{
     const raiz=await obterRaiz(false);
-    // já existe uma pasta com esse nome? (o Windows não diferencia maiúsculas de minúsculas)
-    let existe=false;
-    try{await raiz.getDirectoryHandle(nome);existe=true;}catch(e){if(!e||e.name!=='NotFoundError')throw e;}
-    if(existe){setPastaStatus('A pasta “'+nome+'” já existe em “'+raiz.name+'”. Nada foi alterado.','warn');return;}
-    // pastas parecidas (ex.: mesma empresa cadastrada com outro sufixo)
-    const alvo=_norm(nome),parecidas=[];
-    for await(const ent of raiz.values()){
-      if(ent.kind!=='directory')continue;
-      const n=_norm(ent.name);
-      if(n.length>=4&&alvo.length>=4&&(n.startsWith(alvo)||alvo.startsWith(n)))parecidas.push(ent.name);
-      if(parecidas.length>=3)break;
+    const r=await prepararPastaEmpresa(raiz,nome);
+    if(r.recusada){setPastaStatus('Não criada: já existe pasta parecida ('+r.recusada.join('; ')+').','warn');return;}
+    if(r.criada)setPastaStatus('✓ Pasta criada: “'+raiz.name+'” › “'+nome+'” com '+SUBPASTAS.length+' subpastas (Legalização, Pessoal, Fiscal, Contábil, Onboarding e Comercial).','ok');
+    else setPastaStatus(r.faltantes.length?'A pasta “'+nome+'” já existe; foram criadas as subpastas que faltavam ('+r.faltantes.length+'). Nada mais foi alterado.':'A pasta “'+nome+'” já existe e já tem todas as subpastas. Nada foi alterado.',r.faltantes.length?'ok':'warn');
+  }catch(e){erroPasta(e,'criado');}
+}
+
+// ── PDF sem valores salvo direto na subpasta 6.DEPARTAMENTO_COMERCIAL ──
+const PASTA_COMERCIAL=SUBPASTAS[5];
+const HTML2PDF_URL='https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js';
+function carregaHtml2pdf(){
+  if(window.html2pdf)return Promise.resolve();
+  return new Promise((res,rej)=>{
+    const sc=document.createElement('script');sc.src=HTML2PDF_URL;
+    sc.onload=()=>window.html2pdf?res():rej(new Error('biblioteca de PDF indisponível'));
+    sc.onerror=()=>rej(new Error('não foi possível carregar a biblioteca de PDF (verifique a internet)'));
+    document.head.appendChild(sc);
+  });
+}
+async function gerarPdfBlob(){
+  gerarResumo(true);   // sempre SEM honorários e demais valores financeiros
+  const src=document.getElementById('print-doc');
+  const box=document.createElement('div');
+  box.style.cssText='position:absolute;left:0;top:0;z-index:-1;width:688px;background:#fff;font-size:11px;color:#1C2840;font-family:Lato,sans-serif;pointer-events:none';
+  const clone=document.createElement('div');clone.innerHTML=src.innerHTML;   // sem id: o #print-doc fica oculto na tela
+  box.appendChild(clone);document.body.appendChild(box);
+  const sy=window.scrollY,sx=window.scrollX;
+  try{
+    window.scrollTo({top:0,left:0,behavior:'instant'});   // o html2canvas erra o recorte se a página estiver rolada (e o CSS tem scroll suave)
+    if(document.fonts&&document.fonts.ready)await document.fonts.ready;
+    return await window.html2pdf().set({
+      margin:[14,14,18,14],image:{type:'jpeg',quality:.95},
+      html2canvas:{scale:2,useCORS:true,backgroundColor:'#fff',scrollX:0,scrollY:0},
+      jsPDF:{unit:'mm',format:'a4',orientation:'portrait'},
+      pagebreak:{mode:['css'],avoid:['.pd-section']}
+    }).from(clone).outputPdf('blob');
+  }finally{box.remove();window.scrollTo({top:sy,left:sx,behavior:'instant'});}
+}
+function nomeArquivoPdf(nome){
+  const d=new Date(),p=n=>String(n).padStart(2,'0');
+  return 'Ficha Comercial - '+nome+' - '+d.getFullYear()+'-'+p(d.getMonth()+1)+'-'+p(d.getDate())+' (sem valores).pdf';
+}
+function baixarBlob(blob,nome){
+  const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=nome;
+  document.body.appendChild(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove();},500);
+}
+async function salvarPdfComercial(){
+  syncPastaNome();
+  const nome=nomePastaSeguro(g('pastaNome'));
+  if(!nome){setPastaStatus('Informe o nome da empresa (ou o nome da pasta) para salvar o PDF.','err');return;}
+  const btn=document.getElementById('btnPdfPasta');if(btn)btn.disabled=true;
+  try{
+    // 1) acesso ao servidor primeiro: o navegador só aceita o pedido de permissão logo após o clique
+    let raiz=null;
+    if(temApiPasta()){setPastaStatus('Abrindo pasta do servidor…','load');raiz=await obterRaiz(false);}
+    // 2) gera o PDF
+    setPastaStatus('Gerando o PDF…','load');
+    await carregaHtml2pdf();
+    const blob=await gerarPdfBlob();
+    const arq=nomeArquivoPdf(nome);
+    if(!raiz){
+      baixarBlob(blob,arq);
+      setPastaStatus('Este navegador não grava direto no servidor: o PDF foi baixado. Mova-o para a pasta “'+PASTA_COMERCIAL+'” da empresa (ou use o Chrome/Edge).','warn');return;
     }
-    if(parecidas.length&&!confirm('Já existe pasta parecida no servidor:\n\n'+parecidas.join('\n')+'\n\nCriar mesmo assim a pasta “'+nome+'”?')){
-      setPastaStatus('Não criada: já existe pasta parecida ('+parecidas.join('; ')+').','warn');return;
-    }
-    await raiz.getDirectoryHandle(nome,{create:true});
-    setPastaStatus('✓ Pasta criada: “'+raiz.name+'” › “'+nome+'”.','ok');
+    // 3) pasta da empresa + subpasta 6 e grava o arquivo (nunca sobrescreve: se já existir, numera)
+    const r=await prepararPastaEmpresa(raiz,nome);
+    if(r.recusada){baixarBlob(blob,arq);setPastaStatus('Pasta da empresa não criada (já existe uma parecida). O PDF foi baixado para você mover manualmente.','warn');return;}
+    const sub=await r.dir.getDirectoryHandle(PASTA_COMERCIAL,{create:true});
+    let final=arq,k=1;
+    for(;;){try{await sub.getFileHandle(final);k++;final=arq.replace(/\.pdf$/,' ('+k+').pdf');}catch(e){if(e&&e.name==='NotFoundError')break;throw e;}}
+    const fh=await sub.getFileHandle(final,{create:true});
+    const w=await fh.createWritable();await w.write(blob);await w.close();
+    setPastaStatus('✓ PDF sem valores salvo em “'+nome+'” › “'+PASTA_COMERCIAL+'” › '+final+(r.criada?' (a pasta da empresa foi criada com as subpastas).':'.'),'ok');
   }catch(e){
-    const n=e&&e.name;
-    setPastaStatus(n==='AbortError'?'Nenhuma pasta de clientes escolhida — nada foi criado.':n==='NotAllowedError'?'Sem permissão para gravar nessa pasta. Clique em “Trocar pasta de clientes” e autorize o acesso.':'Não foi possível criar a pasta: '+(e&&e.message||e),n==='AbortError'?'warn':'err');
-  }
+    if(e&&(e.name==='AbortError'||e.name==='NotAllowedError'))erroPasta(e,'salvo');
+    else setPastaStatus('Não foi possível salvar o PDF: '+(e&&e.message||e),'err');
+  }finally{if(btn)btn.disabled=false;}
 }
 function autoPasta(){
   const cb=document.getElementById('pastaAuto');
@@ -1487,9 +1577,9 @@ function montaBat(caminho,nome){
   const base=String(caminho).trim().replace(/[\\\/]+$/,'');
   const alvo=(base+'\\'+nome).replace(/%/g,'%%');
   return ['chcp 65001 >nul','@echo off','set "PASTA='+alvo+'"',
-    'if exist "%PASTA%" goto existe','mkdir "%PASTA%"','if errorlevel 1 goto erro',
-    'echo Pasta criada com sucesso.','goto fim',':existe','echo A pasta ja existe. Nada foi alterado.','goto fim',
-    ':erro','echo ERRO: nao foi possivel criar a pasta. Verifique o acesso ao servidor.',':fim','pause',''].join('\r\n');
+    'if not exist "%PASTA%" mkdir "%PASTA%"','if not exist "%PASTA%" goto erro']
+    .concat(SUBPASTAS.map(n=>'if not exist "%PASTA%\\'+n+'" mkdir "%PASTA%\\'+n+'"'))
+    .concat(['echo Pasta e subpastas prontas.','goto fim',':erro','echo ERRO: nao foi possivel criar a pasta. Verifique o acesso ao servidor.',':fim','pause','']).join('\r\n');
 }
 function baixarBat(){
   syncPastaNome();
