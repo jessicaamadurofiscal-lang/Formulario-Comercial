@@ -126,6 +126,7 @@ input.auto,select.auto,textarea.auto{background:var(--green-bg);border-color:var
 .pasta-box{border:1px solid var(--border-m);border-left:3px solid var(--navy);border-radius:var(--r);padding:12px;margin:14px 0;background:var(--silver-xl)}
 .pasta-box details{margin-top:10px}
 .pasta-box summary{cursor:pointer;font-size:12px;color:var(--text-s)}
+.btn-bloq{opacity:.45;cursor:not-allowed}
 .pasta-row{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:8px}
 .pasta-row input[type=text]{flex:1;min-width:200px}
 .fil-card{border:1px solid var(--border-m);border-left:3px solid var(--navy);border-radius:var(--r);padding:12px 12px 0;margin-bottom:12px;background:var(--silver-xl)}
@@ -569,7 +570,7 @@ input.auto,select.auto,textarea.auto{background:var(--green-bg);border-color:var
     <!-- E-MAIL PARA O FINANCEIRO -->
     <div class="pasta-box" id="emailBox">
       <div class="fl">✉️ E-mail de nova empresa para o financeiro</div>
-      <div class="hint">Monta o e-mail no modelo padrão com os dados da ficha. Complete os 3 campos abaixo que não existem na ficha; você ainda pode editar o texto antes de enviar.</div>
+      <div class="hint">Monta o e-mail no modelo padrão com os dados da ficha. Complete os 3 campos abaixo que não existem na ficha; você ainda pode editar o texto antes de enviar. <b>O e-mail só pode ser copiado ou aberto quando todos os 14 itens estiverem preenchidos.</b></div>
       <div class="grid g3" style="margin-top:8px">
         <div class="fg"><div class="fl">Código Domínio</div><input id="codDominio" placeholder="Ex: 1745"></div>
         <div class="fg"><div class="fl">Objeto social</div><input id="objetoSocial" list="objetoLista" placeholder="Ex: Comércio"><datalist id="objetoLista"><option value="Comércio"><option value="Indústria"><option value="Serviços"><option value="Comércio e Serviços"><option value="Indústria e Comércio"></datalist></div>
@@ -580,11 +581,12 @@ input.auto,select.auto,textarea.auto{background:var(--green-bg);border-color:var
       <div class="cnpj-status" id="emailStatus" style="margin-top:8px"></div>
       <div id="emailPreview" style="display:none;margin-top:8px">
         <div style="font-size:12px;line-height:1.7"><b>Para:</b> <span id="emPara"></span><br><b>Cc:</b> <span id="emCc"></span><br><b>Assunto:</b> <input type="text" id="emAssunto" style="width:100%"></div>
-        <textarea id="emCorpo" rows="22" style="width:100%;margin-top:6px;font-family:inherit;font-size:13px"></textarea>
+        <div class="cnpj-status err" id="emailAlerta" style="display:none;margin-top:8px;font-weight:700"></div>
+        <textarea id="emCorpo" rows="22" style="width:100%;margin-top:6px;font-family:inherit;font-size:13px" oninput="atualizaEstadoEmail()"></textarea>
         <div class="pasta-row">
-          <button class="btn btn-navy btn-sm" onclick="abrirEmail('mailto')">Abrir no programa de e-mail</button>
-          <button class="btn btn-sm" onclick="abrirEmail('gmail')">Abrir no Gmail</button>
-          <button class="btn btn-sm" onclick="copiarEmail()">Copiar e-mail</button>
+          <button class="btn btn-navy btn-sm" id="btnEmMailto" onclick="abrirEmail('mailto')">Abrir no programa de e-mail</button>
+          <button class="btn btn-sm" id="btnEmGmail" onclick="abrirEmail('gmail')">Abrir no Gmail</button>
+          <button class="btn btn-sm" id="btnEmCopiar" onclick="copiarEmail()">Copiar e-mail</button>
         </div>
       </div>
     </div>
@@ -1638,9 +1640,11 @@ function texto13(){
   return t+(v?' — R$ '+v:'');
 }
 function textoHonorario(){
-  const f=getFiliaisResumo(),mat=g('honorario');
-  if(!f.length)return mat;
-  return ['Matriz: '+(mat||'—')].concat(f.map(x=>'Filial '+x.filial+': '+(x.honorario||'—'))).join(' | ');
+  const total=parseInt((document.getElementById('filialFields')||{}).dataset?.count||'0',10),mat=g('honorario');
+  if(!total)return mat;
+  const l=['Matriz: '+(mat||'—')];
+  for(let i=1;i<=total;i++)l.push('Filial '+i+': '+(g('honFil_'+i)||'—'));   // filial sem honorário informado aparece como — e bloqueia o envio
+  return l.join(' | ');
 }
 function montaEmailFinanceiro(){
   const hoje=new Date().toLocaleDateString('pt-BR');
@@ -1670,9 +1674,29 @@ function gerarEmailFinanceiro(){
   document.getElementById('emAssunto').value=m.assunto;
   document.getElementById('emCorpo').value=m.corpo;
   document.getElementById('emailPreview').style.display='block';
-  const st=document.getElementById('emailStatus');
-  st.textContent=m.faltam.length?'E-mail montado, mas faltam: '+m.faltam.join(', ')+'. Preencha na ficha (ou edite o texto abaixo) antes de enviar.':'✓ E-mail pronto. Confira o texto e clique em uma das opções para enviar.';
-  st.className='cnpj-status '+(m.faltam.length?'warn':'ok');
+  atualizaEstadoEmail();
+}
+// Itens numerados do texto que estão vazios ou com "—" (vale o que está no texto, inclusive o que a pessoa editou)
+function faltamNoEmail(){
+  const out=[];
+  document.getElementById('emCorpo').value.split('\n').forEach(l=>{
+    const m=l.match(/^\s*\d+\.\s*([^:]+):\s*(.*)$/);if(!m)return;
+    const v=m[2].trim();
+    if(!v||v==='—'||v==='-'||/(^|[:|]\s*)—\s*(\||$)/.test(v))out.push(m[1].trim());
+  });
+  return out;
+}
+function atualizaEstadoEmail(){
+  const f=faltamNoEmail(),al=document.getElementById('emailAlerta'),st=document.getElementById('emailStatus');
+  ['btnEmMailto','btnEmGmail','btnEmCopiar'].forEach(id=>{const b=document.getElementById(id);b.classList.toggle('btn-bloq',f.length>0);b.setAttribute('aria-disabled',f.length>0?'true':'false');b.title=f.length?'Preencha todos os itens para liberar':'';});
+  if(f.length){al.textContent='⚠️ E-mail incompleto — não pode ser copiado nem enviado. Falta preencher: '+f.join(', ')+'.';al.style.display='block';st.textContent='';st.className='cnpj-status';}
+  else{al.style.display='none';st.textContent='✓ E-mail pronto. Confira o texto e clique em uma das opções para enviar.';st.className='cnpj-status ok';}
+  return f;
+}
+function emailPronto(){   // bloqueia copiar/abrir enquanto faltar informação
+  const f=atualizaEstadoEmail();
+  if(f.length){window.alert('ATENÇÃO: o e-mail está incompleto e não pode ser copiado nem enviado.\n\nFalta preencher:\n• '+f.join('\n• ')+'\n\nComplete na ficha (e gere o e-mail de novo) ou edite o texto.');return false;}
+  return true;
 }
 function linkEmail(tipo){
   const assunto=document.getElementById('emAssunto').value,corpo=document.getElementById('emCorpo').value,e=encodeURIComponent;
@@ -1681,10 +1705,12 @@ function linkEmail(tipo){
 }
 function abrirEmail(tipo){
   if(!document.getElementById('emCorpo').value){gerarEmailFinanceiro();}
+  if(!emailPronto())return;
   const url=linkEmail(tipo);
   if(tipo==='gmail')window.open(url,'_blank','noopener');else window.location.href=url;
 }
 async function copiarEmail(){
+  if(!emailPronto())return;
   const t='Para: '+EMAIL_PARA+'\nCc: '+EMAIL_CC.join('; ')+'\nAssunto: '+document.getElementById('emAssunto').value+'\n\n'+document.getElementById('emCorpo').value;
   try{await navigator.clipboard.writeText(t);toast('E-mail copiado');}catch(e){const ta=document.getElementById('emCorpo');ta.select();document.execCommand('copy');toast('Texto copiado');}
 }
@@ -1692,7 +1718,7 @@ async function copiarEmail(){
 function reset(){
   qa('input:not([type=hidden]):not([type=file]):not([type=checkbox]):not([data-keep]),select,textarea').forEach(el=>{el.value='';el.classList.remove('auto');delete el.dataset.manual});
   document.getElementById('pastaStatus').textContent='';document.getElementById('pastaStatus').className='cnpj-status';
-  document.getElementById('emailStatus').textContent='';document.getElementById('emailStatus').className='cnpj-status';document.getElementById('emailPreview').style.display='none';
+  document.getElementById('emailStatus').textContent='';document.getElementById('emailAlerta').style.display='none';document.getElementById('emailStatus').className='cnpj-status';document.getElementById('emailPreview').style.display='none';
   qa('[id^="b-"]').forEach(el=>el.style.display='none');
   qa('.chip').forEach(c=>c.classList.remove('sel'));
   qa('#tsPanel input:checked').forEach(c=>c.checked=false);
