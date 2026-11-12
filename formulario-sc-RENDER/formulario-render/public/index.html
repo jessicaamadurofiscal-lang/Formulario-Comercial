@@ -566,6 +566,29 @@ input.auto,select.auto,textarea.auto{background:var(--green-bg);border-color:var
       </details>
     </div>
 
+    <!-- E-MAIL PARA O FINANCEIRO -->
+    <div class="pasta-box" id="emailBox">
+      <div class="fl">✉️ E-mail de nova empresa para o financeiro</div>
+      <div class="hint">Monta o e-mail no modelo padrão com os dados da ficha. Complete os 3 campos abaixo que não existem na ficha; você ainda pode editar o texto antes de enviar.</div>
+      <div class="grid g3" style="margin-top:8px">
+        <div class="fg"><div class="fl">Código Domínio</div><input id="codDominio" placeholder="Ex: 1745"></div>
+        <div class="fg"><div class="fl">Objeto social</div><input id="objetoSocial" list="objetoLista" placeholder="Ex: Comércio"><datalist id="objetoLista"><option value="Comércio"><option value="Indústria"><option value="Serviços"><option value="Comércio e Serviços"><option value="Indústria e Comércio"></datalist></div>
+        <div class="fg"><div class="fl">Data de registro</div><input id="dataRegistro" placeholder="DD/MM/AAAA"></div>
+      </div>
+      <div class="grid g1" style="margin-top:8px"><div class="fg"><div class="fl">Responsável (contato na empresa)</div><input id="respEmail" placeholder="Vem do decisor / pessoa-chave da ficha"></div></div>
+      <div class="pasta-row"><button class="btn btn-navy btn-sm" onclick="gerarEmailFinanceiro()">✉️ Gerar e-mail</button></div>
+      <div class="cnpj-status" id="emailStatus" style="margin-top:8px"></div>
+      <div id="emailPreview" style="display:none;margin-top:8px">
+        <div style="font-size:12px;line-height:1.7"><b>Para:</b> <span id="emPara"></span><br><b>Cc:</b> <span id="emCc"></span><br><b>Assunto:</b> <input type="text" id="emAssunto" style="width:100%"></div>
+        <textarea id="emCorpo" rows="22" style="width:100%;margin-top:6px;font-family:inherit;font-size:13px"></textarea>
+        <div class="pasta-row">
+          <button class="btn btn-navy btn-sm" onclick="abrirEmail('mailto')">Abrir no programa de e-mail</button>
+          <button class="btn btn-sm" onclick="abrirEmail('gmail')">Abrir no Gmail</button>
+          <button class="btn btn-sm" onclick="copiarEmail()">Copiar e-mail</button>
+        </div>
+      </div>
+    </div>
+
     <div class="actions">
       <div class="btn-grp">
         <button class="btn btn-sm" onclick="go('operacional',q('[data-s=operacional]'))">← Editar</button>
@@ -1598,9 +1621,78 @@ function baixarBat(){
   document.getElementById('pastaCaminho').value=localStorage.getItem('ficha_pasta_caminho')||PASTA_PADRAO;
 }catch(e){}})();
 
+// ══ E-MAIL DE NOVA EMPRESA PARA O FINANCEIRO ══
+const EMAIL_PARA='financeiro@sousaecouto.com.br';
+const EMAIL_CC=['marcela.m@sousaecouto.com.br','comercial@sousaecouto.com.br'];
+function saudacao(){const h=new Date().getHours();return h<12?'bom dia':h<18?'boa tarde':'boa noite';}
+function sugereObjeto(){   // pelo CNAE principal: 45–47 comércio, 05–33 indústria, demais serviços
+  const linha=(g('cnaes').split('\n').find(l=>/\(principal\)/i.test(l))||g('cnaes').split('\n')[0]||'').trim();
+  const m=linha.match(/^(\d{2})/);if(!m)return'';
+  const d=parseInt(m[1],10);
+  return d>=45&&d<=47?'Comércio':(d>=5&&d<=33)?'Indústria':'Serviços';
+}
+function texto13(){
+  const t=g('decimoTerceiro'),v=g('valor13');
+  if(!t)return'';
+  if(/não se aplica/i.test(t))return'Já incluído no honorário. (não se aplica)';
+  return t+(v?' — R$ '+v:'');
+}
+function textoHonorario(){
+  const f=getFiliaisResumo(),mat=g('honorario');
+  if(!f.length)return mat;
+  return ['Matriz: '+(mat||'—')].concat(f.map(x=>'Filial '+x.filial+': '+(x.honorario||'—'))).join(' | ');
+}
+function montaEmailFinanceiro(){
+  const hoje=new Date().toLocaleDateString('pt-BR');
+  const razao=g('razaoSocial')||g('nomeGrupo');
+  const socios=getSocios().join('; ');
+  const resp=g('respEmail')||g('decisor')||g('pessoaOp')||g('pessoaFin');
+  const grupo=g('grupoEmp');
+  const campos=[
+    ['Razão Social',razao],['Data de Registro',g('dataRegistro')||hoje],['Código Domínio',g('codDominio')],
+    ['Quadro Societário',socios],['Objeto Social',g('objetoSocial')||sugereObjeto()],['CNPJ',g('cnpj')],
+    ['Tributação',g('regime')],['Valor do Honorário',textoHonorario()],['Sobre o 13º salário',texto13()],
+    ['Data do 1° vencimento do Honorário',g('inicioCob')],['Tipo de Serviço',g('tipoServico')],
+    ['Responsável',resp],['Telefone',g('telefone')],['E-mail',g('email')]];
+  const faltam=campos.filter(([,v])=>!String(v||'').trim()).map(([k])=>k);
+  const corpo=['Prezadas, '+saudacao()+'!','','Informamos sobre a seguinte empresa:','']
+    .concat(campos.map(([k,v],i)=>(i+1)+'. '+k+': '+(String(v||'').trim()||'—')+'\n'))
+    .concat([grupo?'Faz parte do grupo de empresas: '+grupo+'.':'Não participa de nenhum grupo de empresas já existente.','','Havendo alguma dúvida, estamos à disposição.','','At.te']).join('\n');
+  return{assunto:'Nova empresa — '+(razao||'sem razão social')+(g('cnpj')?' — CNPJ '+g('cnpj'):''),corpo,faltam};
+}
+function gerarEmailFinanceiro(){
+  // completa o que dá para sugerir, sem apagar o que a pessoa digitou
+  const pre=(id,v)=>{const el=document.getElementById(id);if(el&&!el.value.trim()&&v)el.value=v;};
+  pre('objetoSocial',sugereObjeto());pre('dataRegistro',new Date().toLocaleDateString('pt-BR'));pre('respEmail',g('decisor')||g('pessoaOp')||g('pessoaFin'));
+  const m=montaEmailFinanceiro();
+  document.getElementById('emPara').textContent=EMAIL_PARA;
+  document.getElementById('emCc').textContent=EMAIL_CC.join('; ');
+  document.getElementById('emAssunto').value=m.assunto;
+  document.getElementById('emCorpo').value=m.corpo;
+  document.getElementById('emailPreview').style.display='block';
+  const st=document.getElementById('emailStatus');
+  st.textContent=m.faltam.length?'E-mail montado, mas faltam: '+m.faltam.join(', ')+'. Preencha na ficha (ou edite o texto abaixo) antes de enviar.':'✓ E-mail pronto. Confira o texto e clique em uma das opções para enviar.';
+  st.className='cnpj-status '+(m.faltam.length?'warn':'ok');
+}
+function linkEmail(tipo){
+  const assunto=document.getElementById('emAssunto').value,corpo=document.getElementById('emCorpo').value,e=encodeURIComponent;
+  if(tipo==='gmail')return'https://mail.google.com/mail/?view=cm&fs=1&to='+e(EMAIL_PARA)+'&cc='+e(EMAIL_CC.join(','))+'&su='+e(assunto)+'&body='+e(corpo);
+  return'mailto:'+EMAIL_PARA+'?cc='+e(EMAIL_CC.join(','))+'&subject='+e(assunto)+'&body='+e(corpo).replace(/%0A/g,'%0D%0A');
+}
+function abrirEmail(tipo){
+  if(!document.getElementById('emCorpo').value){gerarEmailFinanceiro();}
+  const url=linkEmail(tipo);
+  if(tipo==='gmail')window.open(url,'_blank','noopener');else window.location.href=url;
+}
+async function copiarEmail(){
+  const t='Para: '+EMAIL_PARA+'\nCc: '+EMAIL_CC.join('; ')+'\nAssunto: '+document.getElementById('emAssunto').value+'\n\n'+document.getElementById('emCorpo').value;
+  try{await navigator.clipboard.writeText(t);toast('E-mail copiado');}catch(e){const ta=document.getElementById('emCorpo');ta.select();document.execCommand('copy');toast('Texto copiado');}
+}
+
 function reset(){
   qa('input:not([type=hidden]):not([type=file]):not([type=checkbox]):not([data-keep]),select,textarea').forEach(el=>{el.value='';el.classList.remove('auto');delete el.dataset.manual});
   document.getElementById('pastaStatus').textContent='';document.getElementById('pastaStatus').className='cnpj-status';
+  document.getElementById('emailStatus').textContent='';document.getElementById('emailStatus').className='cnpj-status';document.getElementById('emailPreview').style.display='none';
   qa('[id^="b-"]').forEach(el=>el.style.display='none');
   qa('.chip').forEach(c=>c.classList.remove('sel'));
   qa('#tsPanel input:checked').forEach(c=>c.checked=false);
