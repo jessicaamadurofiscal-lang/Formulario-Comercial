@@ -570,7 +570,7 @@ input.auto,select.auto,textarea.auto{background:var(--green-bg);border-color:var
     <!-- E-MAIL PARA O FINANCEIRO -->
     <div class="pasta-box" id="emailBox">
       <div class="fl">✉️ E-mail de nova empresa para o financeiro</div>
-      <div class="hint">Monta o e-mail no modelo padrão com os dados da ficha. Complete os 3 campos abaixo que não existem na ficha; você ainda pode editar o texto antes de enviar. <b>O e-mail só pode ser copiado ou aberto quando todos os 14 itens estiverem preenchidos.</b></div>
+      <div class="hint">Monta o e-mail no modelo padrão com os dados da ficha. Complete os 3 campos abaixo que não existem na ficha; você ainda pode editar o texto antes de enviar. <b>O e-mail só pode ser copiado ou enviado quando todos os 14 itens estiverem preenchidos.</b></div>
       <div class="grid g3" style="margin-top:8px">
         <div class="fg"><div class="fl">Código Domínio</div><input id="codDominio" placeholder="Ex: 1745"></div>
         <div class="fg"><div class="fl">Objeto social</div><input id="objetoSocial" list="objetoLista" placeholder="Ex: Comércio"><datalist id="objetoLista"><option value="Comércio"><option value="Indústria"><option value="Serviços"><option value="Comércio e Serviços"><option value="Indústria e Comércio"></datalist></div>
@@ -584,7 +584,7 @@ input.auto,select.auto,textarea.auto{background:var(--green-bg);border-color:var
         <div class="cnpj-status err" id="emailAlerta" style="display:none;margin-top:8px;font-weight:700"></div>
         <textarea id="emCorpo" rows="22" style="width:100%;margin-top:6px;font-family:inherit;font-size:13px" oninput="atualizaEstadoEmail()"></textarea>
         <div class="pasta-row">
-          <button class="btn btn-navy btn-sm" id="btnEmMailto" onclick="abrirEmail('mailto')">Abrir no programa de e-mail</button>
+          <button class="btn btn-navy btn-sm" id="btnEmGclick" onclick="enviarGclick()">Enviar no processo do G-Click</button>
           <button class="btn btn-sm" id="btnEmGmail" onclick="abrirEmail('gmail')">Abrir no Gmail</button>
           <button class="btn btn-sm" id="btnEmCopiar" onclick="copiarEmail()">Copiar e-mail</button>
         </div>
@@ -1688,7 +1688,7 @@ function faltamNoEmail(){
 }
 function atualizaEstadoEmail(){
   const f=faltamNoEmail(),al=document.getElementById('emailAlerta'),st=document.getElementById('emailStatus');
-  ['btnEmMailto','btnEmGmail','btnEmCopiar'].forEach(id=>{const b=document.getElementById(id);b.classList.toggle('btn-bloq',f.length>0);b.setAttribute('aria-disabled',f.length>0?'true':'false');b.title=f.length?'Preencha todos os itens para liberar':'';});
+  ['btnEmGclick','btnEmGmail','btnEmCopiar'].forEach(id=>{const b=document.getElementById(id);b.classList.toggle('btn-bloq',f.length>0);b.setAttribute('aria-disabled',f.length>0?'true':'false');b.title=f.length?'Preencha todos os itens para liberar':'';});
   if(f.length){al.textContent='⚠️ E-mail incompleto — não pode ser copiado nem enviado. Falta preencher: '+f.join(', ')+'.';al.style.display='block';st.textContent='';st.className='cnpj-status';}
   else{al.style.display='none';st.textContent='✓ E-mail pronto. Confira o texto e clique em uma das opções para enviar.';st.className='cnpj-status ok';}
   return f;
@@ -1708,6 +1708,22 @@ function abrirEmail(tipo){
   if(!emailPronto())return;
   const url=linkEmail(tipo);
   if(tipo==='gmail')window.open(url,'_blank','noopener');else window.location.href=url;
+}
+const GCLICK_URL='https://appp.gclick.com.br/dashboard';
+// O G-Click não aceita dados vindos de outro site: copia o texto do e-mail e abre o G-Click para colar no processo.
+function enviarGclick(){
+  if(!emailPronto())return;
+  const texto=document.getElementById('emCorpo').value,st=document.getElementById('emailStatus');
+  let copiado=false;
+  try{
+    const ta=document.createElement('textarea');ta.value=texto;ta.style.cssText='position:fixed;left:-9999px;top:0';document.body.appendChild(ta);ta.select();
+    copiado=document.execCommand('copy');ta.remove();
+  }catch(e){}
+  if(!copiado&&navigator.clipboard)navigator.clipboard.writeText(texto).then(()=>{copiado=true;},()=>{});
+  window.open(GCLICK_URL,'_blank','noopener');
+  st.textContent=copiado?'✓ Texto do e-mail copiado e G-Click aberto em outra aba. Abra o processo e cole (Ctrl+V).':'G-Click aberto, mas não foi possível copiar sozinho: volte aqui e use “Copiar e-mail”.';
+  st.className='cnpj-status '+(copiado?'ok':'warn');
+  toast(copiado?'Texto copiado — cole no processo do G-Click':'Use “Copiar e-mail”');
 }
 async function copiarEmail(){
   if(!emailPronto())return;
