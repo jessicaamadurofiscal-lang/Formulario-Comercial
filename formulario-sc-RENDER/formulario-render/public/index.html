@@ -143,13 +143,15 @@ input.auto,select.auto,textarea.auto{background:var(--green-bg);border-color:var
 .ck-it{font-size:13px;font-weight:700;color:var(--navy)}
 .ck-id{font-size:11.5px;color:var(--text-s);margin-top:2px;line-height:1.45}
 .ck-files{margin-top:6px;font-size:11.5px;line-height:1.5;word-break:break-all}
-.ck-files div::before{content:"📎 "}
 .ck-act{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:8px}
 .ck-act input[type=file]{display:none}
-.ck-chk{display:flex;gap:6px;align-items:center;font-size:11.5px;cursor:pointer;color:var(--text-s)}
-.ck-chk input[type=checkbox],.pasta-box input[type=checkbox]{width:14px;height:14px;min-width:0;padding:0;margin:0;flex:none;appearance:auto;accent-color:var(--navy);cursor:pointer}
+.pasta-box input[type=checkbox]{width:14px;height:14px;min-width:0;padding:0;margin:0;flex:none;appearance:auto;accent-color:var(--navy);cursor:pointer}
 .ck-obs{padding:10px 14px;font-size:11.5px;color:var(--text-s);background:var(--silver-xl);line-height:1.5}
 .ck-foot{padding:12px 14px;border-top:1px solid var(--border)}
+.ck-fl{display:flex;gap:8px;align-items:center;justify-content:space-between;font-size:11.5px;padding:2px 0}
+.ck-fl span{min-width:0;word-break:break-all}
+.ck-x{border:0;background:transparent;color:#b3261e;font-weight:700;cursor:pointer;font-size:14px;padding:0 4px}
+#btnPdfPasta:disabled{opacity:.45;cursor:not-allowed}
 .ata-paste{margin:6px 0 12px;font-size:12px}
 .ata-paste summary{cursor:pointer;color:var(--text-s)}
 .ata-paste textarea{width:100%;margin-top:8px}
@@ -383,13 +385,13 @@ input.auto,select.auto,textarea.auto{background:var(--green-bg);border-color:var
     </div>
     <div class="grid g2">
       <div class="fg"><div class="fl">CNPJ <span class="badge b-auto" id="b-cnpj" style="display:none">Auto</span></div><input id="cnpj" inputmode="numeric" maxlength="18" placeholder="00.000.000/0001-00" oninput="onCnpjInput(this)"><div class="cnpj-status" id="cnpjStatus"></div></div>
-      <div class="fg"><div class="fl">Data de abertura <span class="badge b-auto" id="b-dc" style="display:none">Auto</span></div><input id="dataConst" placeholder="DD/MM/AAAA"></div>
+      <div class="fg"><div class="fl">Data de abertura <span class="badge b-auto" id="b-dc" style="display:none">Auto</span></div><input id="dataConst" data-fmt="date" placeholder="DD/MM/AAAA"></div>
     </div>
     <div class="grid g2">
       <div class="fg"><div class="fl">Porte <span class="badge b-auto" id="b-porte" style="display:none">Auto</span></div>
         <select id="porte"><option value="">Selecione...</option><option>MEI</option><option>ME</option><option>EPP</option><option>Médio Porte</option><option>Grande Porte</option></select>
       </div>
-      <div class="fg"><div class="fl">Capital social <span class="badge b-auto" id="b-cap" style="display:none">Auto</span></div><input id="capitalSocial" placeholder="R$ 0,00"></div>
+      <div class="fg"><div class="fl">Capital social <span class="badge b-auto" id="b-cap" style="display:none">Auto</span></div><input id="capitalSocial" data-fmt="moneyRS" placeholder="R$ 0,00"></div>
     </div>
     <div class="grid g1"><div class="fg"><div class="fl">Atividade principal <span class="badge b-auto" id="b-atv" style="display:none">Auto</span></div><input id="atividadePrincipal" placeholder="Ex: Comércio varejista de madeira e artefatos"></div></div>
     <div class="grid g1"><div class="fg"><div class="fl">Endereço <span class="badge b-auto" id="b-end" style="display:none">Auto</span></div><input id="localizacao" placeholder="Rua, número — Bairro, Cidade/UF"></div></div>
@@ -445,9 +447,9 @@ input.auto,select.auto,textarea.auto{background:var(--green-bg);border-color:var
       </div>
     </div>
     <div class="grid g3">
-      <div class="fg"><div class="fl">Honorário <span id="honLbl">(R$)</span> <span class="badge b-auto" id="b-hon" style="display:none">Auto</span></div><input id="honorario" placeholder="0,00" oninput="calc13()"></div>
-      <div class="fg"><div class="fl">Início do trabalho <span class="badge b-auto" id="b-it" style="display:none">Auto</span></div><input id="inicioTrab" placeholder="DD/MM/AAAA"></div>
-      <div class="fg"><div class="fl">Início da cobrança <span class="badge b-man">Manual</span></div><input id="inicioCob" placeholder="DD/MM/AAAA"></div>
+      <div class="fg"><div class="fl">Honorário <span id="honLbl">(R$)</span> <span class="badge b-auto" id="b-hon" style="display:none">Auto</span></div><input id="honorario" data-fmt="money" placeholder="0,00" oninput="calc13()"></div>
+      <div class="fg"><div class="fl">Início do trabalho <span class="badge b-auto" id="b-it" style="display:none">Auto</span></div><input id="inicioTrab" data-fmt="date" placeholder="DD/MM/AAAA"></div>
+      <div class="fg"><div class="fl">Início da cobrança <span class="badge b-man">Manual</span></div><input id="inicioCob" data-fmt="date" placeholder="DD/MM/AAAA"></div>
     </div>
     <div id="filialWrap" style="display:none">
       <div class="sdiv" style="margin:1.1rem 0 .8rem">Honorários por filial</div>
@@ -457,7 +459,7 @@ input.auto,select.auto,textarea.auto{background:var(--green-bg);border-color:var
       <div class="fg"><div class="fl">Décimo terceiro <span class="badge b-auto" id="b-dec" style="display:none">Auto</span></div>
         <select id="decimoTerceiro" onchange="calc13()"><option value="">Selecione...</option><option>Parcelado</option><option>Integral em novembro</option><option>Integral em dezembro</option><option>Não se aplica</option></select>
       </div>
-      <div class="fg"><div class="fl">Valor 13º honorários (R$) <span class="badge b-auto" id="b-v13" style="display:none">Auto</span></div><input id="valor13" placeholder="0,00"></div>
+      <div class="fg"><div class="fl">Valor 13º honorários (R$) <span class="badge b-auto" id="b-v13" style="display:none">Auto</span></div><input id="valor13" data-fmt="money" placeholder="0,00"></div>
       <div class="fg"><div class="fl">Contador atual <span class="badge b-auto" id="b-cont" style="display:none">Auto</span></div><input id="contadorAtual" placeholder="Nome do contador"></div>
     </div>
     <div class="sdiv">Responsáveis internos S&amp;C</div>
@@ -593,13 +595,14 @@ input.auto,select.auto,textarea.auto{background:var(--green-bg);border-color:var
       <div class="ck-head">
         <div class="ck-ico">📋</div>
         <div><div class="ck-t">Checklist de Documentos Iniciais</div><div class="ck-s">Documentos padrão para início de contrato</div></div>
-        <div class="ck-prog" id="ckProg">0 de 3 recebidos</div>
+        <div class="ck-prog" id="ckProg">0 de 3 anexados</div>
       </div>
       <div id="ckList"></div>
-      <div class="ck-obs"><b>Observação:</b> os documentos anexados aqui são gravados na subpasta <b>6.DEPARTAMENTO_COMERCIAL</b> da empresa, junto com o formulário sem valores. Anexe quando tiver em mãos; se algum documento ainda não chegou, o formulário pode ser salvo mesmo assim e os documentos adicionados depois.</div>
+      <div class="ck-obs"><b>Observação:</b> os 3 documentos são obrigatórios. Ao finalizar, o sistema <b>cria a pasta da empresa no servidor</b> e salva, na subpasta <b>6.DEPARTAMENTO_COMERCIAL</b>, todos os documentos anexados e o formulário sem valores. Os documentos de sócios podem ser vários (adicione um por vez ou selecione vários de uma vez).</div>
       <div class="ck-foot">
+        <div class="cnpj-status warn" id="ckAlerta" style="margin:0 0 8px;font-weight:700"></div>
         <div class="pasta-row" style="margin-top:0">
-          <button class="btn btn-navy btn-sm" id="btnCkSalvar" onclick="salvarSoChecklist()">💾 Salvar só os documentos em 6.DEPARTAMENTO_COMERCIAL</button>
+          <button class="btn btn-navy btn-sm" id="btnPdfPasta" onclick="salvarPdfComercial()">💾 Criar pasta e salvar documentos + formulário em 6.DEPARTAMENTO_COMERCIAL</button>
         </div>
         <div class="cnpj-status" id="ckStatus" style="margin-top:8px"></div>
       </div>
@@ -608,12 +611,11 @@ input.auto,select.auto,textarea.auto{background:var(--green-bg);border-color:var
     <!-- PASTA DO CLIENTE NO SERVIDOR -->
     <div class="pasta-box" id="pastaBox">
       <div class="fl">📁 Pasta do cliente no servidor</div>
-      <div class="hint">Cria uma pasta com o nome da empresa e, dentro dela, as 6 subpastas padrão (1.DEPARTAMENTO_LEGALIZACAO a 6.DEPARTAMENTO_COMERCIAL). Se a pasta já existir, só completa as subpastas que faltam. O botão “Salvar PDF sem valores” grava o relatório (sem honorários) direto na subpasta 6.DEPARTAMENTO_COMERCIAL, junto com os documentos anexados no checklist acima. Na primeira vez, escolha a pasta <b>\\srv-dc\SOUSA_E_COUTO\NP2\DEP_CONFERENCIA\SUCESSO\RECEPCAO</b>; depois o navegador lembra.</div>
+      <div class="hint">Cria uma pasta com o nome da empresa e, dentro dela, as 6 subpastas padrão (1.DEPARTAMENTO_LEGALIZACAO a 6.DEPARTAMENTO_COMERCIAL). Se a pasta já existir, só completa as subpastas que faltam. Os documentos do checklist e o PDF sem valores são gravados na subpasta 6.DEPARTAMENTO_COMERCIAL pelo botão do checklist (acima). Na primeira vez, escolha a pasta <b>\\srv-dc\SOUSA_E_COUTO\NP2\DEP_CONFERENCIA\SUCESSO\RECEPCAO</b>; depois o navegador lembra.</div>
       <div class="pasta-row">
         <input type="text" id="pastaNome" data-pasta="1" placeholder="Nome da pasta (vem do campo Nome da empresa)" oninput="this.dataset.manual='1'">
         <button class="btn btn-navy btn-sm" id="btnPasta" onclick="criarPasta()">Criar pasta no servidor</button>
         <button class="btn btn-sm" onclick="escolherPasta()">Trocar pasta de clientes</button>
-        <button class="btn btn-navy btn-sm" id="btnPdfPasta" onclick="salvarPdfComercial()">💾 Salvar PDF sem valores + documentos em 6.DEPARTAMENTO_COMERCIAL</button>
       </div>
       <div class="pasta-row"><label style="font-size:12px;display:flex;gap:6px;align-items:center;cursor:pointer"><input type="checkbox" id="pastaAuto" onchange="salvaPrefPasta()"> Criar a pasta automaticamente ao clicar em “Gerar resumo &amp; relatório”</label></div>
       <div class="cnpj-status" id="pastaStatus" style="margin-top:8px"></div>
@@ -646,7 +648,7 @@ input.auto,select.auto,textarea.auto{background:var(--green-bg);border-color:var
       <div class="grid g3" style="margin-top:8px">
         <div class="fg"><div class="fl">Código Domínio</div><input id="codDominio" placeholder="Ex: 1745"></div>
         <div class="fg"><div class="fl">Objeto social</div><input id="objetoSocial" list="objetoLista" placeholder="Ex: Comércio"><datalist id="objetoLista"><option value="Comércio"><option value="Indústria"><option value="Serviços"><option value="Comércio e Serviços"><option value="Indústria e Comércio"></datalist></div>
-        <div class="fg"><div class="fl">Data de registro</div><input id="dataRegistro" placeholder="DD/MM/AAAA"></div>
+        <div class="fg"><div class="fl">Data de registro</div><input id="dataRegistro" data-fmt="date" placeholder="DD/MM/AAAA"></div>
       </div>
       <div class="grid g1" style="margin-top:8px"><div class="fg"><div class="fl">Responsável (contato na empresa)</div><input id="respEmail" placeholder="Vem do decisor / pessoa-chave da ficha"></div></div>
       <div class="pasta-row"><button class="btn btn-navy btn-sm" onclick="gerarEmailFinanceiro()">✉️ Gerar e-mail</button></div>
@@ -663,6 +665,26 @@ input.auto,select.auto,textarea.auto{background:var(--green-bg);border-color:var
       </div>
     </div>
 
+    <!-- MENSAGEM DE BOAS-VINDAS (WHATSAPP) -->
+    <div class="pasta-box" id="zapBox">
+      <div class="fl">💬 Mensagem de boas-vindas para o cliente (WhatsApp)</div>
+      <div class="hint">Texto padrão com os dados da ficha: <b>decisor final</b>, <b>sucesso do cliente (CS)</b> e <b>Kickoff</b>. Informe a data e o horário do Kickoff (se estiverem na ata, já vêm preenchidos). <b>A mensagem só pode ser copiada ou aberta no WhatsApp quando todas as informações estiverem preenchidas.</b></div>
+      <div class="grid g3" style="margin-top:8px">
+        <div class="fg"><div class="fl">Kickoff — data <span class="badge b-auto" id="b-kd" style="display:none">Auto</span></div><input id="kickoffData" data-fmt="date" placeholder="DD/MM/AAAA"></div>
+        <div class="fg"><div class="fl">Kickoff — horário <span class="badge b-auto" id="b-kh" style="display:none">Auto</span></div><input id="kickoffHora" data-fmt="time" placeholder="HH:MM"></div>
+      </div>
+      <div class="pasta-row"><button class="btn btn-navy btn-sm" onclick="gerarZap()">💬 Gerar mensagem</button></div>
+      <div id="zapPreview" style="display:none;margin-top:8px">
+        <div class="cnpj-status err" id="zapAlerta" style="display:none;margin-bottom:6px;font-weight:700"></div>
+        <textarea id="zapMsg" rows="16" style="width:100%;font-family:inherit;font-size:13px" oninput="atualizaEstadoZap()"></textarea>
+        <div class="pasta-row">
+          <button class="btn btn-navy btn-sm" id="btnZapCopiar" onclick="copiarZap()">Copiar mensagem</button>
+          <button class="btn btn-sm" id="btnZapAbrir" onclick="abrirZap()">Abrir no WhatsApp</button>
+        </div>
+        <div class="cnpj-status" id="zapStatus" style="margin-top:8px"></div>
+      </div>
+    </div>
+
     <div class="actions">
       <div class="btn-grp">
         <button class="btn btn-sm" onclick="go('operacional',q('[data-s=operacional]'))">← Editar</button>
@@ -673,7 +695,6 @@ input.auto,select.auto,textarea.auto{background:var(--green-bg);border-color:var
         <button class="btn btn-sm" onclick="copiar(true)">Copiar sem valores</button>
         <button class="btn btn-primary btn-sm" onclick="imprimir()">PDF completo (com valores)</button>
         <button class="btn btn-navy btn-sm" onclick="imprimir(true)">PDF sem valores</button>
-        <button class="btn btn-navy btn-sm" onclick="salvarPdfComercial()">💾 Salvar PDF sem valores na pasta 6.COMERCIAL</button>
       </div>
     </div>
   </div>
@@ -753,6 +774,7 @@ const _nrm=s=>String(s==null?'':s).normalize('NFD').replace(/[\u0300-\u036f]/g,'
 // Campos que a ata pode responder. Ordem = prioridade (os mais específicos primeiro).
 // k = chave usada por fill(); nome = como aparece no relatório da leitura; r = rótulo (texto sem acento, minúsculo)
 const ATA_CAMPOS=[
+  {k:'kickoff',nome:'Kickoff (data e horário)',sec:'k',opt:true,r:/kick[ -]?off/},
   {k:'inicioCobranca',nome:'Início da cobrança',sec:'t',r:/inicio d[ao] cobranca|(1|primeiro)\W{0,3}(o|º)?\s*vencimento|data d[oe]\s*(1|primeiro)\W{0,3}(o|º)?\s*vencimento|cobranca (a partir|inicia|comeca)|vencimento d[oa]s? honorario/},
   {k:'inicioTrabalho',nome:'Início do trabalho',sec:'t',r:/inicio d[eo]s? (trabalhos?|servicos?|contrato|atividades|operacao)|data (de|do) inicio|inicio (previsto|efetivo)|comeca(r)? a (trabalhar|atender)|data de inicio/},
   {k:'decimoTerceiro',nome:'Décimo terceiro',sec:'t',r:/^(13\W{0,2}(o|º|°)?|decimo terceiro)(\s+(salario|honorario|dos honorarios))?\b|sobre o 13|13o salario|13º/},
@@ -786,7 +808,7 @@ const ATA_CAMPOS=[
   {k:'razaoSocial',nome:'Razão social',sec:'d',r:/razao social|nome da empresa|^empresa$|nome empresarial/},
   {k:'cnpj',nome:'CNPJ',sec:'d',r:/^cnpj\b/}
 ];
-const ATA_SEC={t:'Tributário',c:'Contatos',p:'Perfil comercial',d:'Empresa'};
+const ATA_SEC={t:'Tributário',c:'Contatos',p:'Perfil comercial',k:'Kickoff',d:'Empresa'};
 
 function ataCampoDoRotulo(lab,estrito){
   const n=_nrm(lab).replace(/[?:!*_]+/g,' ').replace(/\s+/g,' ').trim();
@@ -843,6 +865,13 @@ function ataData(v){
   if(m)return '01/'+p2(m[1])+'/'+m[2];
   return '';
 }
+function ataHora(v){
+  const m=v.match(/\b(\d{1,2})\s*(?:h|hs|horas?|:)\s*(\d{2})?/i);
+  if(!m)return '';
+  const h=+m[1],mi=m[2]?+m[2]:0;
+  if(h>23||mi>59)return '';
+  return String(h).padStart(2,'0')+':'+String(mi).padStart(2,'0');
+}
 function ataValor(v){
   let m=v.match(/R\$\s*([\d.]+(?:,\d{1,2})?)/i)||v.match(/\b(\d{1,3}(?:\.\d{3})*,\d{2})\b/)||v.match(/^\s*(\d{3,6})\s*(?:reais)?\s*$/i);
   if(!m)return '';
@@ -882,7 +911,7 @@ function ataLimpaTexto(v){
 const _SEM_RESPOSTA=/^(n\/?a|nao informado|sem resposta|nao se aplica|nenhum|nenhuma|-+|_+|\.+|—)$/i;
 
 const ATA_POS={
-  inicioCobranca:ataData,inicioTrabalho:ataData,
+  inicioCobranca:ataData,inicioTrabalho:ataData,kickoff:v=>(ataData(v)||ataHora(v))?v:'',
   honorario:ataValor,regime:ataRegime,decimoTerceiro:ataDecimo,canal:ataCanal,
   email:v=>(v.match(_RE_EMAIL)||[''])[0].toLowerCase(),
   emailGuias:v=>(v.match(_RE_EMAIL)||[''])[0].toLowerCase(),
@@ -920,7 +949,7 @@ function ataParse(texto){
     const r=f?f(v):v;
     if(r)d[c.k]=r;
   }
-  // tipo de serviço que não bate com a lista padrão vai para os próximos passos (não se perde)
+  if(d.kickoff){const kd=ataData(d.kickoff),kh=ataHora(d.kickoff);delete d.kickoff;if(kd)d.kickoffData=kd;if(kh)d.kickoffHora=kh;}
   // ── plano B: informações soltas no texto, sem rótulo ──
   const todo=String(texto||'');
   if(!d.regime){
@@ -933,6 +962,10 @@ function ataParse(texto){
   }
   if(!d.email){const e=[...new Set((todo.match(_RE_EMAIL)||[]).map(x=>x.toLowerCase()))].filter(x=>!/sousaecouto/.test(x));if(e.length===1)d.email=e[0];}
   if(!d.telefone){const ach=todo.match(/\(?\b\d{2}\)?\s*9?\d{4}[-\s]\d{4}\b/g)||[];const f=[...new Set(ach.map(x=>x.replace(/\D/g,'')))];if(f.length===1)d.telefone=ach[0].trim();}
+  if(!d.kickoffData){
+    const m=todo.match(/kick[ -]?off[^\n]{0,80}/i);
+    if(m){const kd=ataData(m[0]),kh=ataHora(m[0]);if(kd)d.kickoffData=kd;if(kh&&!d.kickoffHora)d.kickoffHora=kh;}
+  }
   if(!d.curva){const m=todo.match(/[Cc]urva(?:\s+do\s+cliente)?\s*[:\-–]\s*([A-E])\b/);if(m)d.curva=m[1];}
   if(!d.honorario){
     for(const l of linhas){if(/honor|mensalidade/i.test(_nrm(l))){const v=ataValor(l);if(v){d.honorario=v;break;}}}
@@ -945,7 +978,8 @@ function ataParse(texto){
   for(const c of ATA_CAMPOS){
     if(c.k==='razaoSocial'||c.k==='cnpj'){ if(d[c.k])achados.push({k:c.k,nome:c.nome,sec:c.sec,valor:d[c.k]}); continue; }
     if(c.k==='emailGuias'){ if(d[c.k])achados.push({k:c.k,nome:c.nome,sec:c.sec,valor:d[c.k]}); continue; }
-    if(d[c.k])achados.push({k:c.k,nome:c.nome,sec:c.sec,valor:d[c.k]});
+    const val=c.k==='kickoff'?[d.kickoffData,d.kickoffHora].filter(Boolean).join(' às '):d[c.k];
+    if(val)achados.push({k:c.k,nome:c.nome,sec:c.sec,valor:val});
     else if(!c.opt&&(c.sec==='t'||c.sec==='c'||c.sec==='p'))faltam.push({k:c.k,nome:c.nome,sec:c.sec});
   }
   return {d,achados,faltam};
@@ -1040,7 +1074,7 @@ async function ataLerArquivo(file){
 }
 
 // aplica no formulário: só preenche o que está vazio (ou que já tinha sido preenchido automaticamente)
-const ATA_ID={regime:'regime',honorario:'honorario',inicioTrabalho:'inicioTrab',inicioCobranca:'inicioCob',decimoTerceiro:'decimoTerceiro',contadorAtual:'contadorAtual',executivo:'executivo',csResponsavel:'csResp',proximosPassos:'obsTrib',perfilCliente:'perfilCliente',dorCliente:'dorCliente',expectativa:'expectativa',metaCurto:'metaCurto',metaMedio:'metaMedio',criterioSucesso:'criterio',curva:'curva',probInterno:'probInt',probExterno:'probExt',pessoaOperacional:'pessoaOp',pessoaFinanceira:'pessoaFin',decisor:'decisor',indicou:'indicou',email:'email',telefone:'telefone',razaoSocial:'razaoSocial',cnpj:'cnpj',canal:'canal',tipoServico:'tipoServico'};
+const ATA_ID={regime:'regime',honorario:'honorario',inicioTrabalho:'inicioTrab',inicioCobranca:'inicioCob',decimoTerceiro:'decimoTerceiro',contadorAtual:'contadorAtual',executivo:'executivo',csResponsavel:'csResp',proximosPassos:'obsTrib',perfilCliente:'perfilCliente',dorCliente:'dorCliente',expectativa:'expectativa',metaCurto:'metaCurto',metaMedio:'metaMedio',criterioSucesso:'criterio',curva:'curva',probInterno:'probInt',probExterno:'probExt',pessoaOperacional:'pessoaOp',pessoaFinanceira:'pessoaFin',decisor:'decisor',indicou:'indicou',email:'email',telefone:'telefone',razaoSocial:'razaoSocial',cnpj:'cnpj',canal:'canal',tipoServico:'tipoServico',kickoffData:'kickoffData',kickoffHora:'kickoffHora'};
 function ataAplicar(d){
   const dd={...d};
   for(const k of Object.keys(dd)){
@@ -1061,9 +1095,9 @@ function ataRelatorio(res,extra){
   const linhaOk=a=>`<div class="ata-l ok"><span class="ata-n">✓ ${esc(a.nome)}</span><span class="ata-v">${esc(String(a.valor).slice(0,140))}</span></div>`;
   const linhaNo=a=>`<div class="ata-l no"><span class="ata-n">○ ${esc(a.nome)}</span><span class="ata-v">não encontrado na ata — preencher manualmente</span></div>`;
   let h=`<div class="ata-t">Resultado da leitura da ata</div>`;
-  for(const s of ['t','c','p']){
+  for(const s of ['t','c','p','k']){
     const ok=res.achados.filter(a=>a.sec===s),no=res.faltam.filter(a=>a.sec===s);
-    if(s==='p'&&!ok.length)continue;
+    if((s==='p'||s==='k')&&!ok.length)continue;
     h+=`<div class="ata-sec">${ATA_SEC[s]} <span>${ok.length} de ${ok.length+no.length}</span></div>`+ok.map(linhaOk).join('')+no.map(linhaNo).join('');
   }
   const dd=res.achados.filter(a=>a.sec==='d');
@@ -1154,6 +1188,7 @@ function fill(d){
   set('honorario',(d.honorario||'').replace('R$ ',''),'b-hon');
   set('inicioTrab',d.inicioTrabalho,'b-it');
   set('inicioCob',d.inicioCobranca);set('indicou',d.indicou);
+  set('kickoffData',d.kickoffData,'b-kd');set('kickoffHora',d.kickoffHora,'b-kh');
   set('decimoTerceiro',d.decimoTerceiro,'b-dec');
   calc13();
   set('contadorAtual',d.contadorAtual,'b-cont');
@@ -1246,6 +1281,7 @@ function setTipoServico(valores){
 function parseMoeda(v){
   if(!v)return NaN;
   let s=String(v).replace(/[^\d.,-]/g,'');
+  if(!s.includes(',')&&/^\d{1,3}(\.\d{3})+$/.test(s))s=s.replace(/\./g,'');
   if(s.includes(',')&&s.includes('.')){s=s.replace(/\./g,'').replace(',','.');}
   else if(s.includes(',')){s=s.replace(',','.');}
   return parseFloat(s);
@@ -1659,8 +1695,8 @@ function renderFiliais(count){
   let html='';
   for(let i=1;i<=count;i++){
     html+=`<div class="grid g2">
-      <div class="fg"><div class="fl">Honorário Filial ${i} (R$) <span class="badge b-man">Manual</span></div><input id="honFil_${i}" placeholder="0,00" oninput="calc13()" value="${valoresHon[i]||''}"></div>
-      <div class="fg"><div class="fl">Valor 13º Filial ${i} (R$) <span class="badge b-auto" id="b-v13f${i}" style="display:none">Auto</span></div><input id="honFil13_${i}" placeholder="0,00" value="${valores13[i]||''}"></div>
+      <div class="fg"><div class="fl">Honorário Filial ${i} (R$) <span class="badge b-man">Manual</span></div><input id="honFil_${i}" data-fmt="money" placeholder="0,00" oninput="calc13()" value="${valoresHon[i]||''}"></div>
+      <div class="fg"><div class="fl">Valor 13º Filial ${i} (R$) <span class="badge b-auto" id="b-v13f${i}" style="display:none">Auto</span></div><input id="honFil13_${i}" data-fmt="money" placeholder="0,00" value="${valores13[i]||''}"></div>
     </div>`;
   }
   wrap.innerHTML=html;
@@ -1722,7 +1758,7 @@ function tabelaHonorarios(filiais){
 }
 
 function gerarResumo(sem){
-  syncPastaNome();   // sem=true → relatório impresso SEM honorários e demais valores financeiros
+  syncPastaNome();normalizaPadroes();   // sem=true → relatório impresso SEM honorários e demais valores financeiros
   const filiais=getFiliaisResumo();
   const honFilialTxt=filiais.map(f=>`Filial ${f.filial}: R$ ${f.honorario||'—'}${f.valor13?' (13º: R$ '+f.valor13+')':''}`).join(' | ');
   const filCnpj=getFiliaisCnpj();
@@ -1879,7 +1915,7 @@ function nomePastaSeguro(s){
   if(/^(con|prn|aux|nul|com\d|lpt\d)$/i.test(n))n+=' -';
   return n.slice(0,120).trim();
 }
-function setPastaStatus(msg,cls){const el=document.getElementById('pastaStatus');el.textContent=msg;el.className='cnpj-status '+(cls||'');}
+function setPastaStatus(msg,cls){if(_stCk){setCkStatus(msg,cls);return;}const el=document.getElementById('pastaStatus');el.textContent=msg;el.className='cnpj-status '+(cls||'');}
 function syncPastaNome(){
   const el=document.getElementById('pastaNome');if(!el)return;
   if(el.dataset.manual==='1'&&el.value.trim())return;   // o que a pessoa digitou manda
@@ -1990,48 +2026,50 @@ function baixarBlob(blob,nome){
   const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=nome;
   document.body.appendChild(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove();},500);
 }
+let _stCk=false;   // enquanto o botão do checklist trabalha, as mensagens aparecem no card do checklist
 async function salvarPdfComercial(){
   syncPastaNome();
   const nome=nomePastaSeguro(g('pastaNome'));
-  if(!nome){setPastaStatus('Informe o nome da empresa (ou o nome da pasta) para salvar o PDF.','err');return;}
+  const falta=ckPendentes();
+  if(falta.length){setCkStatus('Anexe todos os documentos antes de finalizar. Falta: '+falta.join(', ')+'.','warn');return;}
+  if(!nome){setCkStatus('Informe o nome da empresa (ou o nome da pasta) para criar a pasta.','err');return;}
   const btn=document.getElementById('btnPdfPasta');if(btn)btn.disabled=true;
+  _stCk=true;
   try{
-    // 1) acesso ao servidor primeiro: o navegador só aceita o pedido de permissão logo após o clique
-    let raiz=null;
-    if(temApiPasta()){setPastaStatus('Abrindo pasta do servidor…','load');raiz=await obterRaiz(false);}
-    // 2) gera o PDF
+    // 1) servidor e pasta da empresa PRIMEIRO (o navegador só aceita o pedido de permissão logo após o clique)
+    if(!temApiPasta()){
+      setPastaStatus('Gerando o PDF…','load');
+      await carregaHtml2pdf();const blob0=await gerarPdfBlob();baixarBlob(blob0,nomeArquivoPdf(nome));
+      setPastaStatus('Este navegador não grava direto no servidor: o PDF foi baixado. Mova-o, junto com os documentos do checklist, para a pasta “'+PASTA_COMERCIAL+'” da empresa (ou use o Chrome/Edge).','warn');return;
+    }
+    setPastaStatus('Abrindo pasta do servidor…','load');
+    const raiz=await obterRaiz(false);
+    setPastaStatus('Criando a pasta da empresa…','load');
+    const r=await prepararPastaEmpresa(raiz,nome);
+    if(r.recusada){setPastaStatus('Pasta da empresa não criada (já existe uma parecida). Nada foi salvo.','warn');return;}
+    const sub=await r.dir.getDirectoryHandle(PASTA_COMERCIAL,{create:true});
+    // 2) gera o PDF antes de gravar qualquer coisa (se falhar, nada fica pela metade)
     setPastaStatus('Gerando o PDF…','load');
     await carregaHtml2pdf();
     const blob=await gerarPdfBlob();
-    const arq=nomeArquivoPdf(nome);
-    if(!raiz){
-      baixarBlob(blob,arq);
-      setPastaStatus('Este navegador não grava direto no servidor: o PDF foi baixado. Mova-o'+(ckTemAnexos()?', junto com os documentos do checklist,':'')+' para a pasta “'+PASTA_COMERCIAL+'” da empresa (ou use o Chrome/Edge).','warn');return;
-    }
-    // 3) pasta da empresa + subpasta 6 e grava o arquivo (nunca sobrescreve: se já existir, numera)
-    const r=await prepararPastaEmpresa(raiz,nome);
-    if(r.recusada){baixarBlob(blob,arq);setPastaStatus('Pasta da empresa não criada (já existe uma parecida). O PDF foi baixado para você mover manualmente.','warn');return;}
-    const sub=await r.dir.getDirectoryHandle(PASTA_COMERCIAL,{create:true});
-    let final=arq,k=1;
-    for(;;){try{await sub.getFileHandle(final);k++;final=arq.replace(/\.pdf$/,' ('+k+').pdf');}catch(e){if(e&&e.name==='NotFoundError')break;throw e;}}
-    const fh=await sub.getFileHandle(final,{create:true});
-    const w=await fh.createWritable();await w.write(blob);await w.close();
-    // 4) documentos do checklist (contrato social, sócios, certificado digital) na mesma subpasta
-    let docs=[];
-    if(ckTemAnexos()){setPastaStatus('Gravando os documentos do checklist…','load');docs=await ckGravar(sub,nome);}
-    const pend=ckPendentes();
-    setPastaStatus('✓ PDF sem valores salvo em “'+nome+'” › “'+PASTA_COMERCIAL+'” › '+final+(docs.length?' + '+docs.length+' documento(s) do checklist ('+docs.join(' | ')+')':'')+(r.criada?' (a pasta da empresa foi criada com as subpastas).':'.')+(pend.length?' Pendentes no checklist: '+pend.join(', ')+'.':''),pend.length?'warn':'ok');
+    // 3) grava os documentos do checklist e o formulário sem valores, tudo na subpasta 6
+    setPastaStatus('Gravando os documentos e o formulário…','load');
+    const docs=await ckGravar(sub,nome);
+    const final=await gravarSemSobrescrever(sub,nomeArquivoPdf(nome),blob);
+    const novos=docs.filter(d=>!d.pulado).map(d=>d.nome),jaTinha=docs.filter(d=>d.pulado).length;
+    setPastaStatus('✓ Pasta “'+nome+'” '+(r.criada?'criada com as subpastas. ':'já existia. ')+'Em “'+PASTA_COMERCIAL+'” foram salvos: '+final+(novos.length?' | '+novos.join(' | '):'')+'.'+(jaTinha?' ('+jaTinha+' documento(s) já estavam na pasta e não foram duplicados.)':''),'ok');
   }catch(e){
     if(e&&(e.name==='AbortError'||e.name==='NotAllowedError'))erroPasta(e,'salvo');
-    else setPastaStatus('Não foi possível salvar o PDF: '+(e&&e.message||e),'err');
-  }finally{if(btn)btn.disabled=false;}
+    else setPastaStatus('Não foi possível salvar: '+(e&&e.message||e),'err');
+  }finally{_stCk=false;ckAtualiza();}
 }
 // ══ CHECKLIST DE DOCUMENTOS INICIAIS → 6.DEPARTAMENTO_COMERCIAL ══
 const CK_ITEMS=[
   {id:'ckContrato',n:1,t:'Contrato Social da empresa',d:'Contrato social consolidado e a última alteração contratual registrada.',pref:'Contrato Social',accept:'.pdf,.jpg,.jpeg,.png,.doc,.docx'},
-  {id:'ckSocios',n:2,t:'Documentos dos sócios',d:'RG ou CNH e CPF de todos os sócios (frente e verso).',pref:'Documentos dos sócios',accept:'.pdf,.jpg,.jpeg,.png,.doc,.docx'},
+  {id:'ckSocios',n:2,t:'Documentos dos sócios',d:'RG ou CNH e CPF de todos os sócios (frente e verso). Pode anexar mais de um documento.',pref:'Documentos dos sócios',accept:'.pdf,.jpg,.jpeg,.png,.doc,.docx'},
   {id:'ckCert',n:3,t:'Certificado digital',d:'Certificado digital da empresa (e-CNPJ) ou do sócio (e-CPF) — arquivo ou cópia.',pref:'Certificado digital',accept:''}
 ];
+const CK_FILES={};CK_ITEMS.forEach(it=>CK_FILES[it.id]=[]);
 (function buildChecklist(){
   document.getElementById('ckList').innerHTML=CK_ITEMS.map(it=>`
     <div class="ck-item" id="${it.id}-row">
@@ -2041,67 +2079,56 @@ const CK_ITEMS=[
         <div class="ck-id">${it.d}</div>
         <div class="ck-files" id="${it.id}-files"></div>
         <div class="ck-act">
-          <button type="button" class="btn btn-sm" onclick="document.getElementById('${it.id}').click()">📎 Anexar arquivo(s)</button>
-          <button type="button" class="btn btn-sm" id="${it.id}-clr" style="display:none" onclick="ckLimpar('${it.id}')">Remover</button>
-          <label class="ck-chk"><input type="checkbox" id="${it.id}-chk" onchange="ckAtualiza()"> Documento recebido</label>
-          <input type="file" id="${it.id}" multiple ${it.accept?'accept="'+it.accept+'"':''} onchange="ckAtualiza(true)">
+          <button type="button" class="btn btn-sm" id="${it.id}-add" onclick="document.getElementById('${it.id}').click()">📎 Anexar arquivo(s)</button>
+          <input type="file" id="${it.id}" multiple ${it.accept?'accept="'+it.accept+'"':''} onchange="ckAdd('${it.id}',this)">
         </div>
       </div>
     </div>`).join('');
 })();
-function ckArquivos(id){return [...(document.getElementById(id).files||[])];}
-function ckAtualiza(veioDoArquivo){
+function ckArquivos(id){return CK_FILES[id]||[];}
+function ckAdd(id,inp){   // acumula: cada seleção ADICIONA aos arquivos já anexados
+  const lista=CK_FILES[id];
+  [...(inp.files||[])].forEach(f=>{if(!lista.some(x=>x.name===f.name&&x.size===f.size))lista.push(f);});
+  inp.value='';
+  ckAtualiza();
+}
+function ckRemover(id,i){CK_FILES[id].splice(i,1);ckAtualiza();}
+function ckAtualiza(){
   let n=0;
   CK_ITEMS.forEach(it=>{
-    const fs=ckArquivos(it.id),chk=document.getElementById(it.id+'-chk'),row=document.getElementById(it.id+'-row');
-    if(veioDoArquivo&&fs.length)chk.checked=true;
-    if(veioDoArquivo&&!fs.length)chk.checked=false;
-    row.classList.toggle('ok',chk.checked);
-    if(chk.checked)n++;
-    document.getElementById(it.id+'-files').innerHTML=fs.map(f=>'<div>'+esc(f.name)+' <span style="color:var(--text-s)">('+Math.max(1,Math.round(f.size/1024))+' KB)</span></div>').join('');
-    document.getElementById(it.id+'-clr').style.display=fs.length?'':'none';
+    const fs=ckArquivos(it.id),row=document.getElementById(it.id+'-row');
+    row.classList.toggle('ok',fs.length>0);
+    if(fs.length)n++;
+    document.getElementById(it.id+'-files').innerHTML=fs.map((f,i)=>'<div class="ck-fl"><span>📎 '+esc(f.name)+' <span style="color:var(--text-s)">('+Math.max(1,Math.round(f.size/1024))+' KB)</span></span><button type="button" class="ck-x" title="Remover" onclick="ckRemover(\''+it.id+'\','+i+')">✕</button></div>').join('');
+    document.getElementById(it.id+'-add').textContent=fs.length?'➕ Adicionar mais arquivo(s)':'📎 Anexar arquivo(s)';
   });
-  document.getElementById('ckProg').textContent=n+' de '+CK_ITEMS.length+' recebidos';
+  document.getElementById('ckProg').textContent=n+' de '+CK_ITEMS.length+' anexados';
+  const falta=ckPendentes(),al=document.getElementById('ckAlerta'),btn=document.getElementById('btnPdfPasta');
+  al.textContent=falta.length?'⚠️ Para finalizar, anexe: '+falta.join(', ')+'.':'';
+  al.style.display=falta.length?'block':'none';
+  if(btn&&!_stCk){btn.disabled=falta.length>0;btn.title=falta.length?'Anexe os 3 documentos para liberar':'';}
 }
-function ckLimpar(id){document.getElementById(id).value='';ckAtualiza(true);}
-function ckReset(){CK_ITEMS.forEach(it=>{document.getElementById(it.id).value='';document.getElementById(it.id+'-chk').checked=false;});ckAtualiza();const st=document.getElementById('ckStatus');st.textContent='';st.className='cnpj-status';}
+function ckReset(){CK_ITEMS.forEach(it=>{CK_FILES[it.id]=[];document.getElementById(it.id).value='';});ckAtualiza();const st=document.getElementById('ckStatus');st.textContent='';st.className='cnpj-status';}
 function ckTemAnexos(){return CK_ITEMS.some(it=>ckArquivos(it.id).length);}
-function ckPendentes(){return CK_ITEMS.filter(it=>!document.getElementById(it.id+'-chk').checked&&!ckArquivos(it.id).length).map(it=>it.t);}
-// grava todos os anexos do checklist na subpasta (nunca sobrescreve); devolve os nomes gravados
+function ckPendentes(){return CK_ITEMS.filter(it=>!ckArquivos(it.id).length).map(it=>it.t);}
+// grava todos os anexos na subpasta. Nunca sobrescreve: nome igual com tamanho igual = já estava lá (pula); nome igual com conteúdo diferente = numera "(2)"
 async function ckGravar(sub,nome){
-  const salvos=[];
+  const out=[];
   for(const it of CK_ITEMS){
     for(const f of ckArquivos(it.id)){
       const ext=(f.name.match(/\.[^.]+$/)||[''])[0].toLowerCase();
       const orig=nomePastaSeguro(f.name.replace(/\.[^.]+$/,''));
       const alvo=it.n+' - '+it.pref+' - '+(orig||nome)+ext;
-      salvos.push(await gravarSemSobrescrever(sub,alvo,f));
+      let ex=null;
+      try{const fh=await sub.getFileHandle(alvo);ex=fh.getFile?await fh.getFile():null;}catch(e){if(!e||e.name!=='NotFoundError')throw e;}
+      if(ex&&ex.size===f.size){out.push({nome:alvo,pulado:true});continue;}
+      out.push({nome:await gravarSemSobrescrever(sub,alvo,f)});
     }
   }
-  return salvos;
+  return out;
 }
 function setCkStatus(m,c){const el=document.getElementById('ckStatus');el.textContent=m;el.className='cnpj-status '+(c||'');}
-async function salvarSoChecklist(){
-  syncPastaNome();
-  const nome=nomePastaSeguro(g('pastaNome'));
-  if(!nome){setCkStatus('Informe o nome da empresa (ou o nome da pasta) para salvar os documentos.','err');return;}
-  if(!ckTemAnexos()){setCkStatus('Anexe pelo menos um documento do checklist.','warn');return;}
-  if(!temApiPasta()){setCkStatus('Este navegador não grava direto no servidor. Use o Chrome ou o Edge — ou copie os arquivos manualmente para a pasta “'+PASTA_COMERCIAL+'” da empresa.','warn');return;}
-  const btn=document.getElementById('btnCkSalvar');btn.disabled=true;
-  try{
-    setCkStatus('Abrindo pasta do servidor…','load');
-    const raiz=await obterRaiz(false);
-    const r=await prepararPastaEmpresa(raiz,nome);
-    if(r.recusada){setCkStatus('Pasta da empresa não criada (já existe uma parecida). Nada foi salvo.','warn');return;}
-    const sub=await r.dir.getDirectoryHandle(PASTA_COMERCIAL,{create:true});
-    const salvos=await ckGravar(sub,nome);
-    const pend=ckPendentes();
-    setCkStatus('✓ '+salvos.length+' arquivo(s) salvo(s) em “'+nome+'” › “'+PASTA_COMERCIAL+'”: '+salvos.join(' | ')+'.'+(pend.length?' Ainda pendentes: '+pend.join(', ')+'.':''),pend.length?'warn':'ok');
-  }catch(e){
-    const n=e&&e.name;
-    setCkStatus(n==='AbortError'?'Nenhuma pasta escolhida — nada foi salvo.':n==='NotAllowedError'?'Sem permissão para gravar nessa pasta. Use “Trocar pasta de clientes” e autorize o acesso.':'Não foi possível salvar os documentos: '+(e&&e.message||e),n==='AbortError'?'warn':'err');
-  }finally{btn.disabled=false;}
-}
+ckAtualiza();
 function autoPasta(){
   const cb=document.getElementById('pastaAuto');
   if(cb&&cb.checked)criarPasta(true).catch(()=>{});
@@ -2305,6 +2332,104 @@ async function copiarEmail(){
   try{await navigator.clipboard.writeText(t);toast('E-mail copiado');}catch(e){const ta=document.getElementById('emCorpo');ta.select();document.execCommand('copy');toast('Texto copiado');}
 }
 
+/* ── PADRONIZAÇÃO DE VALORES, DATAS E HORÁRIOS ── */
+function padMoeda(v,rs){
+  let t=String(v==null?'':v).trim();if(!t)return t;
+  t=t.replace(/R\$\s*/gi,'').replace(/\s/g,'');
+  if(!/^\d[\d.,]*$/.test(t)||(t.match(/,/g)||[]).length>1)return v;   // texto livre: não mexe
+  let n;
+  if(t.includes(','))n=parseFloat(t.replace(/\./g,'').replace(',','.'));
+  else if(/^\d{1,3}(\.\d{3})+$/.test(t))n=parseFloat(t.replace(/\./g,''));
+  else if((t.match(/\./g)||[]).length>1)return v;
+  else n=parseFloat(t);
+  return isFinite(n)?(rs?'R$ ':'')+formatMoeda(n):v;
+}
+function padData(v){
+  const t=String(v==null?'':v).trim();if(!t)return t;
+  let d,m,a;
+  let x=t.match(/^(\d{1,2})\s*[\/.\-\s]\s*(\d{1,2})\s*[\/.\-\s]\s*(\d{4}|\d{2})$/);
+  if(x){d=+x[1];m=+x[2];a=x[3];}
+  else if((x=t.match(/^(\d{2})(\d{2})(\d{4})$/))){d=+x[1];m=+x[2];a=x[3];}
+  else if((x=t.match(/^(\d{2})(\d{2})(\d{2})$/))){d=+x[1];m=+x[2];a=x[3];}
+  else return v;
+  if(a.length===2)a='20'+a;
+  if(d<1||d>31||m<1||m>12)return v;
+  return String(d).padStart(2,'0')+'/'+String(m).padStart(2,'0')+'/'+a;
+}
+function padHora(v){
+  const t=String(v==null?'':v).trim();if(!t)return t;
+  let x=t.match(/^(\d{1,2})\s*(?::|h|hs|horas?)\s*(\d{2})?\s*(?:min)?$/i)||t.match(/^(\d{2})(\d{2})$/)||t.match(/^(\d{1,2})$/);
+  if(!x)return v;
+  const h=+x[1],mi=x[2]?+x[2]:0;
+  if(h>23||mi>59)return v;
+  return String(h).padStart(2,'0')+':'+String(mi).padStart(2,'0');
+}
+function padCampo(el){
+  const f=el.dataset&&el.dataset.fmt;if(!f||!el.value)return;
+  const n=f==='money'?padMoeda(el.value,false):f==='moneyRS'?padMoeda(el.value,true):f==='date'?padData(el.value):f==='time'?padHora(el.value):el.value;
+  if(n!==el.value)el.value=n;
+}
+function normalizaPadroes(){
+  qa('[data-fmt]').forEach(padCampo);
+}
+{const _fill0=fill;fill=function(d){const r=_fill0(d);normalizaPadroes();return r;};}
+document.addEventListener('focusout',e=>{
+  const el=e.target;
+  if(el&&el.dataset&&el.dataset.fmt){padCampo(el);if(/^(honorario|honFil_\d+)$/.test(el.id)&&typeof calc13==='function')calc13();}
+});
+
+/* ── MENSAGEM DE BOAS-VINDAS (WHATSAPP) ── */
+const EMAIL_SUCESSO='sucesso@sousaecouto.com.br';
+function montaZap(){
+  const dec=g('decisor').trim()||'[nome do decisor]';
+  const cs=g('csResp').trim()||'[nome do sucesso do cliente]';
+  const dt=padData(g('kickoffData').trim())||'[data]';
+  const hr=padHora(g('kickoffHora').trim())||'[horário]';
+  return dec+', quero começar te dando as boas-vindas! Ficamos muito felizes em ter você e a sua empresa com a gente, acreditamos que essa será uma parceria de muito sucesso. Vamos caminhar juntos nessa transição, para que tudo aconteça de forma leve e organizada.\n\n'
+   +'Para avançarmos, estou enviando em anexo o checklist com a documentação necessária para a transição. Você pode mandar os documentos para '+EMAIL_SUCESSO+'.\n'
+   +'Queria saber também quem ficará responsável por reunir esses documentos e fazer a ponte com a contabilidade anterior. Se preferir, a gente faz o contato formal por e-mail. É só nos enviar o contato deles.\n\n'
+   +'Aproveito para avisar que '+cs+' será o responsável pela sua empresa no Sucesso do Cliente. Nos vemos no Kickoff, dia '+dt+' às '+hr+'.\n'
+   +'Qualquer dúvida, é só me chamar!';
+}
+function gerarZap(){
+  normalizaPadroes();
+  document.getElementById('zapMsg').value=montaZap();
+  document.getElementById('zapPreview').style.display='block';
+  atualizaEstadoZap();
+}
+function faltamNoZap(){
+  const t=document.getElementById('zapMsg').value,out=[];
+  if(/\[nome do decisor\]/.test(t))out.push('Nome do decisor (Contatos › Decisor final)');
+  if(/\[nome do sucesso do cliente\]/.test(t))out.push('Sucesso do cliente (Tributário › CS)');
+  if(/\[data\]/.test(t))out.push('Data do Kickoff');
+  if(/\[horário\]/.test(t))out.push('Horário do Kickoff');
+  return out;
+}
+function atualizaEstadoZap(){
+  const f=faltamNoZap(),al=document.getElementById('zapAlerta'),st=document.getElementById('zapStatus');
+  ['btnZapCopiar','btnZapAbrir'].forEach(id=>{const b=document.getElementById(id);b.classList.toggle('btn-bloq',f.length>0);b.setAttribute('aria-disabled',f.length>0?'true':'false');b.title=f.length?'Preencha todas as informações para liberar':'';});
+  if(f.length){al.textContent='⚠️ Mensagem incompleta — não pode ser copiada nem aberta no WhatsApp. Falta preencher: '+f.join(', ')+'. (Preencha e clique em “Gerar mensagem” de novo, ou edite o texto.)';al.style.display='block';st.textContent='';st.className='cnpj-status';}
+  else{al.style.display='none';st.textContent='✓ Mensagem pronta. Confira o texto e copie ou abra no WhatsApp.';st.className='cnpj-status ok';}
+  return f;
+}
+function zapPronto(){
+  const f=atualizaEstadoZap();
+  if(f.length){window.alert('ATENÇÃO: a mensagem está incompleta e não pode ser copiada nem enviada.\n\nFalta preencher:\n• '+f.join('\n• ')+'\n\nComplete na ficha e clique em “Gerar mensagem” de novo, ou edite o texto.');return false;}
+  return true;
+}
+async function copiarZap(){
+  if(!zapPronto())return;
+  const t=document.getElementById('zapMsg').value;
+  try{await navigator.clipboard.writeText(t);toast('Mensagem copiada');}catch(e){const ta=document.getElementById('zapMsg');ta.select();document.execCommand('copy');toast('Mensagem copiada');}
+}
+function abrirZap(){
+  if(!zapPronto())return;
+  let fone=g('telefone').replace(/\D/g,'');
+  if(fone.length===10||fone.length===11)fone='55'+fone;
+  const url='https://wa.me/'+(fone.length>=12?fone:'')+'?text='+encodeURIComponent(document.getElementById('zapMsg').value);
+  window.open(url,'_blank','noopener');
+}
+
 function reset(){
   qa('input:not([type=hidden]):not([type=file]):not([type=checkbox]):not([data-keep]),select,textarea').forEach(el=>{el.value='';el.classList.remove('auto');delete el.dataset.manual});
   document.getElementById('pastaStatus').textContent='';document.getElementById('pastaStatus').className='cnpj-status';
@@ -2328,6 +2453,7 @@ function reset(){
   document.getElementById('inclBaixadas').checked=false;setStatus('buscaFilStatus','','');
   delete q('#sbx').dataset.src;
   ckReset();
+  document.getElementById('zapPreview').style.display='none';document.getElementById('zapAlerta').style.display='none';
   const ar=document.getElementById('ataRes');ar.style.display='none';ar.innerHTML='';
   fi.value='';go('upload',q('[data-s=upload]'));
 }
