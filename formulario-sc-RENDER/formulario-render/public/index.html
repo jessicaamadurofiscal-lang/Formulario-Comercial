@@ -659,8 +659,8 @@ input.auto,select.auto,textarea.auto{background:var(--green-bg);border-color:var
       <div id="emailPreview" style="display:none;margin-top:8px">
         <div style="font-size:12px;line-height:1.7"><b>Para:</b> <span id="emPara"></span><br><b>Cc:</b> <span id="emCc"></span><br><b>Assunto:</b> <input type="text" id="emAssunto" style="width:100%"></div>
         <div class="cnpj-status err" id="emailAlerta" style="display:none;margin-top:8px;font-weight:700"></div>
-        <div id="emailAvisoVermelho" style="display:none;margin-top:8px"><div style="font-size:11.5px;color:var(--text-s);margin-bottom:3px">Como o texto sai ao copiar / enviar no G-Click (itens numerados e aviso de nova constituição em negrito).</div><div id="emailRichPreview" style="border:1px solid var(--border-m);border-radius:8px;padding:10px 12px;background:#fff;font-size:13px;line-height:1.5;max-height:340px;overflow:auto"></div></div>
-        <textarea id="emCorpo" rows="22" style="width:100%;margin-top:6px;font-family:inherit;font-size:13px" oninput="atualizaEstadoEmail()"></textarea>
+        <div id="emailAvisoVermelho" style="display:none;margin-top:8px"><div style="font-size:11.5px;color:var(--text-s);margin-bottom:3px">Texto do e-mail — é exatamente assim que ele sai ao copiar / enviar no G-Click (itens numerados em negrito). Se precisar, pode editar aqui mesmo.</div><div id="emailRichPreview" contenteditable="true" spellcheck="false" oninput="sincEmailRico()" style="border:1px solid var(--border-m);border-radius:8px;padding:10px 12px;background:#fff;font-size:13px;line-height:1.5;max-height:520px;overflow:auto;outline:none"></div></div>
+        <textarea id="emCorpo" rows="22" style="display:none" oninput="atualizaEstadoEmail()"></textarea>
         <div class="pasta-row">
           <button class="btn btn-navy btn-sm" id="btnEmGclick" onclick="enviarGclick()">Enviar no processo do G-Click</button>
           <button class="btn btn-sm" id="btnEmCopiar" onclick="copiarEmail()">Copiar e-mail</button>
@@ -2295,7 +2295,14 @@ async function copiaRicoEmail(texto){
 function atualizaAvisoVermelho(){   // pré-visualização formatada (é assim que o texto sai ao copiar / enviar no G-Click)
   const el=document.getElementById('emailAvisoVermelho'),pv=document.getElementById('emailRichPreview');if(!el||!pv)return;
   const t=document.getElementById('emCorpo').value;
-  pv.innerHTML=emailHtml(t);el.style.display=t?'block':'none';
+  if(!_editRico)pv.innerHTML=emailHtml(t);   // durante a digitação não redesenha (senão o cursor pula)
+  el.style.display=t?'block':'none';
+}
+let _editRico=false;
+function sincEmailRico(){   // o que foi editado na caixa formatada vira o texto do e-mail
+  const pv=document.getElementById('emailRichPreview');
+  document.getElementById('emCorpo').value=pv.innerText.replace(/\u00a0/g,' ').replace(/\n{3,}/g,'\n\n').replace(/\s+$/,'');
+  _editRico=true;try{atualizaEstadoEmail();}finally{_editRico=false;}
 }
 function montaEmailFinanceiro(){
   const hoje=new Date().toLocaleDateString('pt-BR');
