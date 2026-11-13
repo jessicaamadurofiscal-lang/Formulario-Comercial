@@ -239,7 +239,7 @@ input.auto,select.auto,textarea.auto{background:var(--green-bg);border-color:var
   #panel-resumo>.ph{display:none}
   #panel-resumo>.pb{padding:0}
   #print-doc{display:block!important}
-  .stats,.rsec-screen{display:none!important}
+  .stats,.rsec-screen,.pasta-box,.ck-card{display:none!important}
 }
 
 /* Documento de impressão — oculto na tela */
@@ -661,14 +661,16 @@ input.auto,select.auto,textarea.auto{background:var(--green-bg);border-color:var
           <button class="btn btn-navy btn-sm" id="btnEmGclick" onclick="enviarGclick()">Enviar no processo do G-Click</button>
           <button class="btn btn-sm" id="btnEmGmail" onclick="abrirEmail('gmail')">Abrir no Gmail</button>
           <button class="btn btn-sm" id="btnEmCopiar" onclick="copiarEmail()">Copiar e-mail</button>
+          <button class="btn btn-sm" id="btnEmConfirma" onclick="confirmarEnvio('email')">✔ Confirmar que enviei</button>
         </div>
+        <div class="cnpj-status" id="emailEstado" style="margin-top:6px"></div>
       </div>
     </div>
 
     <!-- MENSAGEM DE BOAS-VINDAS (WHATSAPP) -->
     <div class="pasta-box" id="zapBox">
       <div class="fl">💬 Mensagem de boas-vindas para o cliente (WhatsApp)</div>
-      <div class="hint">Texto padrão com os dados da ficha: <b>decisor final</b>, <b>sucesso do cliente (CS)</b> e <b>Kickoff</b>. Informe a data e o horário do Kickoff (se estiverem na ata, já vêm preenchidos). <b>A mensagem só pode ser copiada ou aberta no WhatsApp quando todas as informações estiverem preenchidas.</b></div>
+      <div class="hint">Texto padrão com os dados da ficha: <b>decisor final</b>, <b>sucesso do cliente (CS)</b> e <b>Kickoff</b>. Informe a data e o horário do Kickoff (se estiverem na ata, já vêm preenchidos). O sistema não enxerga o que acontece dentro do WhatsApp: copiar ou abrir <u>não</u> conta como enviada — depois de enviar, clique em <b>Confirmar que enviei</b>. <b>A mensagem só pode ser copiada ou aberta no WhatsApp quando todas as informações estiverem preenchidas.</b></div>
       <div class="grid g3" style="margin-top:8px">
         <div class="fg"><div class="fl">Kickoff — data <span class="badge b-auto" id="b-kd" style="display:none">Auto</span></div><input id="kickoffData" data-fmt="date" placeholder="DD/MM/AAAA"></div>
         <div class="fg"><div class="fl">Kickoff — horário <span class="badge b-auto" id="b-kh" style="display:none">Auto</span></div><input id="kickoffHora" data-fmt="time" placeholder="HH:MM"></div>
@@ -680,7 +682,9 @@ input.auto,select.auto,textarea.auto{background:var(--green-bg);border-color:var
         <div class="pasta-row">
           <button class="btn btn-navy btn-sm" id="btnZapCopiar" onclick="copiarZap()">Copiar mensagem</button>
           <button class="btn btn-sm" id="btnZapAbrir" onclick="abrirZap()">Abrir no WhatsApp</button>
+          <button class="btn btn-sm" id="btnZapConfirma" onclick="confirmarEnvio('zap')">✔ Confirmar que enviei</button>
         </div>
+        <div class="cnpj-status" id="zapEstado" style="margin-top:6px"></div>
         <div class="cnpj-status" id="zapStatus" style="margin-top:8px"></div>
       </div>
     </div>
@@ -1724,8 +1728,8 @@ function chip(el,grp){
 function skipUpload(){al('warn','Preenchimento manual','Preencha os campos manualmente.');go('dados',q('[data-s=dados]'));}
 
 /* ── GERAR RESUMO ── */
-function row(l,v){return v?`<div class="pd-row"><div class="pd-lbl">${l}</div><div class="pd-val">${v}</div></div>`:''}
-function rowH(l,v){return v?`<div class="pd-row"><div class="pd-lbl">${l}</div><div class="pd-val highlight">${v}</div></div>`:''}
+function row(l,v){if(_semValor&&typeof v==='string')v=redigeValores(v);return v?`<div class="pd-row"><div class="pd-lbl">${l}</div><div class="pd-val">${v}</div></div>`:''}
+function rowH(l,v){if(_semValor&&typeof v==='string')v=redigeValores(v);return v?`<div class="pd-row"><div class="pd-lbl">${l}</div><div class="pd-val highlight">${v}</div></div>`:''}
 function sec(title,cols,rows){
   const r=rows.filter(Boolean).join('');
   if(!r)return'';
@@ -1758,7 +1762,7 @@ function tabelaHonorarios(filiais){
 }
 
 function gerarResumo(sem){
-  syncPastaNome();normalizaPadroes();   // sem=true → relatório impresso SEM honorários e demais valores financeiros
+  syncPastaNome();normalizaPadroes();_semValor=!!sem;   // sem=true → relatório impresso SEM honorários e demais valores financeiros
   const filiais=getFiliaisResumo();
   const honFilialTxt=filiais.map(f=>`Filial ${f.filial}: R$ ${f.honorario||'—'}${f.valor13?' (13º: R$ '+f.valor13+')':''}`).join(' | ');
   const filCnpj=getFiliaisCnpj();
@@ -1861,11 +1865,14 @@ function gerarResumo(sem){
   ${g('obsTrib')||g('obsGerais')||g('obsOp')?sec('Observações e próximos passos',1,
     [row('Tributário / implementação',g('obsTrib')),row('Observações gerais',g('obsGerais')),row('Observações de onboarding',g('obsOp'))]):'' }
 
+  ${informativoProcesso()}
+
   <div class="pd-footer">
     <p>Sousa &amp; Couto Assessoria Contábil e Financeira · Gerado em ${hoje} · Uso interno</p>
     <div class="assinatura">Assinatura / Aprovação</div>
   </div>`;
 
+  _semValor=false;
   document.getElementById('print-doc').innerHTML=html;
   go('resumo',q('[data-s=resumo]'));
 }
@@ -1894,7 +1901,8 @@ function copiar(sem){
     'CONTATOS','Operacional: '+g('pessoaOp'),'Financeiro: '+g('pessoaFin'),
     'Decisor: '+g('decisor'),'E-mail: '+g('email'),'Telefone: '+g('telefone'),
   ].filter(l=>!l.includes(': ')||l.split(': ')[1]).join('\n');
-  navigator.clipboard.writeText(linhas).then(()=>{toast('✓ Dados copiados');const b=q('#bcopy');b.textContent='✓ Copiado!';setTimeout(()=>b.textContent='Copiar dados',2500);});
+  const linhasOut=sem?redigeValores(linhas):linhas;
+  navigator.clipboard.writeText(linhasOut).then(()=>{toast('✓ Dados copiados');const b=q('#bcopy');b.textContent='✓ Copiado!';setTimeout(()=>b.textContent='Copiar dados',2500);});
 }
 
 // ══ PASTA DO CLIENTE NO SERVIDOR ══
@@ -2048,17 +2056,22 @@ async function salvarPdfComercial(){
     const r=await prepararPastaEmpresa(raiz,nome);
     if(r.recusada){setPastaStatus('Pasta da empresa não criada (já existe uma parecida). Nada foi salvo.','warn');return;}
     const sub=await r.dir.getDirectoryHandle(PASTA_COMERCIAL,{create:true});
-    // 2) gera o PDF antes de gravar qualquer coisa (se falhar, nada fica pela metade)
+    // 2) documentos do checklist (nome igual e tamanho igual = já estava lá, não duplica)
+    setPastaStatus('Gravando os documentos do checklist…','load');
+    const docs=await ckGravar(sub,nome);
+    const nomesDocs=docs.map(d=>d.nome);
+    const cam=caminhoRecepcao()+'\\'+nome;
+    PROC.pasta={criada:r.criada,caminho:cam,sub:cam+'\\'+PASTA_COMERCIAL,arquivos:nomesDocs.concat(['Formulário sem valores (PDF)'])};   // já entra no PDF que vai ser gerado agora
+    // 3) formulário sem valores
     setPastaStatus('Gerando o PDF…','load');
     await carregaHtml2pdf();
     const blob=await gerarPdfBlob();
-    // 3) grava os documentos do checklist e o formulário sem valores, tudo na subpasta 6
-    setPastaStatus('Gravando os documentos e o formulário…','load');
-    const docs=await ckGravar(sub,nome);
     const final=await gravarSemSobrescrever(sub,nomeArquivoPdf(nome),blob);
+    PROC.pasta.arquivos=nomesDocs.concat([final]);
     const novos=docs.filter(d=>!d.pulado).map(d=>d.nome),jaTinha=docs.filter(d=>d.pulado).length;
     setPastaStatus('✓ Pasta “'+nome+'” '+(r.criada?'criada com as subpastas. ':'já existia. ')+'Em “'+PASTA_COMERCIAL+'” foram salvos: '+final+(novos.length?' | '+novos.join(' | '):'')+'.'+(jaTinha?' ('+jaTinha+' documento(s) já estavam na pasta e não foram duplicados.)':''),'ok');
   }catch(e){
+    if(PROC.pasta)PROC.pasta.arquivos=PROC.pasta.arquivos.filter(x=>x!=='Formulário sem valores (PDF)');
     if(e&&(e.name==='AbortError'||e.name==='NotAllowedError'))erroPasta(e,'salvo');
     else setPastaStatus('Não foi possível salvar: '+(e&&e.message||e),'err');
   }finally{_stCk=false;ckAtualiza();}
@@ -2192,33 +2205,38 @@ async function salvarFormContrato(){
     // 1) acesso ao servidor primeiro (o navegador só aceita o pedido de permissão logo após o clique)
     let raiz=null;
     if(temApiPasta()){setContratoStatus('Abrindo pasta do servidor…','load');raiz=await obterRaiz(false,CONTRATO_CHAVE,CONTRATO_PICKER);}
-    // 2) gera o PDF COMPLETO (com valores)
-    setContratoStatus('Gerando o PDF com valores…','load');
-    await carregaHtml2pdf();
-    const blob=await gerarPdfBlob(false);
     const arq=nomeArquivoPdf(nome,false);
     if(!raiz){
-      baixarBlob(blob,arq);
+      setContratoStatus('Gerando o PDF com valores…','load');
+      await carregaHtml2pdf();const blob0=await gerarPdfBlob(false);
+      baixarBlob(blob0,arq);
       setContratoStatus('Este navegador não grava direto no servidor: o PDF foi baixado'+(contrato?' (o contrato continua no seu computador)':'')+'. Mova para a pasta 5.FORMULARIO_CONTRATO\\'+nome+' ou use o Chrome/Edge.','warn');return;
     }
-    // 3) pasta com o nome da empresa dentro de 5.FORMULARIO_CONTRATO
+    // 2) pasta com o nome da empresa dentro de 5.FORMULARIO_CONTRATO
     let dir=null;
     try{dir=await raiz.getDirectoryHandle(nome);}catch(e){if(!e||e.name!=='NotFoundError')throw e;}
     if(!dir){
       const par=await pastasParecidas(raiz,nome);
       if(par.length&&!confirm('Já existe pasta parecida em “'+raiz.name+'”:\n\n'+par.join('\n')+'\n\nCriar mesmo assim a pasta “'+nome+'”?')){
-        baixarBlob(blob,arq);setContratoStatus('Nada foi salvo no servidor (já existe pasta parecida). O PDF foi baixado para você mover manualmente.','warn');return;
+        setContratoStatus('Nada foi salvo no servidor (já existe pasta parecida).','warn');return;
       }
       dir=await raiz.getDirectoryHandle(nome,{create:true});
     }
-    // 4) grava formulário + contrato
-    const salvos=[await gravarSemSobrescrever(dir,arq,blob)];
+    // 3) contrato primeiro; depois o formulário com valores (o PDF já sai com o informativo atualizado)
+    const salvos=[];
     if(contrato){
       const ext=(contrato.name.match(/\.[^.]+$/)||['.pdf'])[0].toLowerCase();
       salvos.push(await gravarSemSobrescrever(dir,'Contrato de Prestação de Serviços - '+nome+ext,contrato));
     }
+    PROC.contrato={caminho:CAMINHO_FORM+'\\'+nome,arquivos:salvos.concat(['Formulário com valores (PDF)'])};
+    setContratoStatus('Gerando o PDF com valores…','load');
+    await carregaHtml2pdf();
+    const blob=await gerarPdfBlob(false);
+    salvos.push(await gravarSemSobrescrever(dir,arq,blob));
+    PROC.contrato.arquivos=salvos.slice();
     setContratoStatus('✓ Salvo em “'+raiz.name+'” › “'+nome+'”: '+salvos.join(' | ')+(contrato?'':' (sem contrato — lembre de adicionar depois).'),contrato?'ok':'warn');
   }catch(e){
+    if(PROC.contrato)PROC.contrato.arquivos=PROC.contrato.arquivos.filter(x=>x!=='Formulário com valores (PDF)');
     const n=e&&e.name;
     setContratoStatus(n==='AbortError'?'Nenhuma pasta escolhida — nada foi salvo.':n==='NotAllowedError'?'Sem permissão para gravar nessa pasta. Clique em “Trocar pasta 5.FORMULARIO_CONTRATO” e autorize o acesso.':'Não foi possível salvar: '+(e&&e.message||e),n==='AbortError'?'warn':'err');
   }finally{btn.disabled=false;}
@@ -2308,6 +2326,7 @@ function abrirEmail(tipo){
   if(!document.getElementById('emCorpo').value){gerarEmailFinanceiro();}
   if(!emailPronto())return;
   const url=linkEmail(tipo);
+  procEnvio('email','aberto');
   if(tipo==='gmail')window.open(url,'_blank','noopener');else window.location.href=url;
 }
 const GCLICK_URL='https://appp.gclick.com.br/dashboard';
@@ -2322,6 +2341,7 @@ function enviarGclick(){
   }catch(e){}
   if(!copiado&&navigator.clipboard)navigator.clipboard.writeText(texto).then(()=>{copiado=true;},()=>{});
   window.open(GCLICK_URL,'_blank','noopener');
+  procEnvio('email','aberto');
   st.textContent=copiado?'✓ Texto do e-mail copiado e G-Click aberto em outra aba. Abra o processo e cole (Ctrl+V).':'G-Click aberto, mas não foi possível copiar sozinho: volte aqui e use “Copiar e-mail”.';
   st.className='cnpj-status '+(copiado?'ok':'warn');
   toast(copiado?'Texto copiado — cole no processo do G-Click':'Use “Copiar e-mail”');
@@ -2329,7 +2349,8 @@ function enviarGclick(){
 async function copiarEmail(){
   if(!emailPronto())return;
   const t='Para: '+EMAIL_PARA+'\nCc: '+EMAIL_CC.join('; ')+'\nAssunto: '+document.getElementById('emAssunto').value+'\n\n'+document.getElementById('emCorpo').value;
-  try{await navigator.clipboard.writeText(t);toast('E-mail copiado');}catch(e){const ta=document.getElementById('emCorpo');ta.select();document.execCommand('copy');toast('Texto copiado');}
+  try{await navigator.clipboard.writeText(t);toast('E-mail copiado (ainda não enviado)');}catch(e){const ta=document.getElementById('emCorpo');ta.select();document.execCommand('copy');toast('Texto copiado (ainda não enviado)');}
+  procEnvio('email','copiado');
 }
 
 /* ── PADRONIZAÇÃO DE VALORES, DATAS E HORÁRIOS ── */
@@ -2389,7 +2410,7 @@ function montaZap(){
    +'Para avançarmos, estou enviando em anexo o checklist com a documentação necessária para a transição. Você pode mandar os documentos para '+EMAIL_SUCESSO+'.\n'
    +'Queria saber também quem ficará responsável por reunir esses documentos e fazer a ponte com a contabilidade anterior. Se preferir, a gente faz o contato formal por e-mail. É só nos enviar o contato deles.\n\n'
    +'Aproveito para avisar que '+cs+' será o responsável pela sua empresa no Sucesso do Cliente. Nos vemos no Kickoff, dia '+dt+' às '+hr+'.\n'
-   +'Qualquer dúvida, é só me chamar!';
+   +'Qualquer dúvida, fico à disposição.';
 }
 function gerarZap(){
   normalizaPadroes();
@@ -2420,7 +2441,9 @@ function zapPronto(){
 async function copiarZap(){
   if(!zapPronto())return;
   const t=document.getElementById('zapMsg').value;
-  try{await navigator.clipboard.writeText(t);toast('Mensagem copiada');}catch(e){const ta=document.getElementById('zapMsg');ta.select();document.execCommand('copy');toast('Mensagem copiada');}
+  try{await navigator.clipboard.writeText(t);}catch(e){const ta=document.getElementById('zapMsg');ta.select();document.execCommand('copy');}
+  toast('Mensagem copiada — ainda NÃO enviada');
+  procEnvio('zap','copiado');
 }
 function abrirZap(){
   if(!zapPronto())return;
@@ -2428,6 +2451,65 @@ function abrirZap(){
   if(fone.length===10||fone.length===11)fone='55'+fone;
   const url='https://wa.me/'+(fone.length>=12?fone:'')+'?text='+encodeURIComponent(document.getElementById('zapMsg').value);
   window.open(url,'_blank','noopener');
+  procEnvio('zap','aberto');
+  toast('WhatsApp aberto — depois de enviar, clique em “Confirmar que enviei”');
+}
+
+/* ── ACOMPANHAMENTO DO PROCESSO (aparece no informativo do relatório) ── */
+const PROC={pasta:null,contrato:null,email:{e:'nao',q:''},zap:{e:'nao',q:''}};
+const CAMINHO_RECEPCAO_PADRAO='\\\\srv-dc\\SOUSA_E_COUTO\\NP2\\DEP_CONFERENCIA\\SUCESSO\\RECEPCAO';
+const CAMINHO_FORM='\\\\srv-dc\\SOUSA_E_COUTO\\NP2\\DEP_COMERCIAL\\5.FORMULARIO_CONTRATO';
+function agora(){const d=new Date();return d.toLocaleDateString('pt-BR')+' '+d.toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'});}
+function caminhoRecepcao(){return (g('pastaCaminho').trim()||CAMINHO_RECEPCAO_PADRAO).replace(/[\\\/]+$/,'');}
+const ENV_ORD={nao:0,copiado:1,aberto:2,enviado:3};
+const ENV_TXT={
+  email:{nao:'Não enviado',copiado:'Texto copiado — ainda NÃO enviado',aberto:'Aberto no G-Click/Gmail — envio ainda não confirmado',enviado:'Enviado ao financeiro'},
+  zap:{nao:'Não enviada',copiado:'Mensagem apenas copiada — ainda NÃO enviada',aberto:'Aberta no WhatsApp — envio ainda não confirmado',enviado:'Enviada ao cliente pelo WhatsApp'}};
+function envioTxt(k){const s=PROC[k];return ENV_TXT[k][s.e]+(s.q?' ('+(s.e==='enviado'?'confirmado em ':'')+s.q+')':'');}
+function procEnvio(k,e){   // só avança: nao → copiado → aberto → enviado (copiar depois de abrir não "desfaz" nada)
+  if(ENV_ORD[e]>=ENV_ORD[PROC[k].e])PROC[k]={e,q:e==='nao'?'':agora()};
+  renderEnvio();
+}
+function confirmarEnvio(k){
+  if(PROC[k].e==='enviado'){PROC[k]={e:'nao',q:''};renderEnvio();return;}
+  if(k==='email'?(!document.getElementById('emCorpo').value||atualizaEstadoEmail().length):(!document.getElementById('zapMsg').value||faltamNoZap().length)){
+    window.alert('Gere e complete '+(k==='email'?'o e-mail':'a mensagem')+' antes de confirmar o envio.');return;}
+  PROC[k]={e:'enviado',q:agora()};renderEnvio();
+}
+function renderEnvio(){
+  [['email','emailEstado','btnEmConfirma'],['zap','zapEstado','btnZapConfirma']].forEach(([k,id,bt])=>{
+    const el=document.getElementById(id),b=document.getElementById(bt);if(!el||!b)return;
+    const e=PROC[k].e;
+    el.textContent=(e==='enviado'?'✓ ':e==='nao'?'○ ':'⚠ ')+envioTxt(k);
+    el.className='cnpj-status '+(e==='enviado'?'ok':e==='nao'?'':'warn');
+    b.textContent=e==='enviado'?'↩ Desmarcar envio':'✔ Confirmar que enviei';
+  });
+}
+function procReset(){PROC.pasta=null;PROC.contrato=null;PROC.email={e:'nao',q:''};PROC.zap={e:'nao',q:''};renderEnvio();}
+function informativoProcesso(){
+  const N=(l,v)=>`<div class="pd-row"><div class="pd-lbl">${l}</div><div class="pd-val">${v}</div></div>`;
+  const p=PROC.pasta,c=PROC.contrato;
+  const r1=p?'✓ Pasta '+(p.criada?'criada':'já existente (completada)')+' no caminho:<br>'+esc(p.caminho)+'<br>✓ Documentos e formulário sem valores salvos em:<br>'+esc(p.sub)+'<br>Arquivos: '+p.arquivos.map(esc).join('; ')
+    :'○ Pasta e documentos ainda não salvos no servidor';
+  const r2=c?'✓ Pasta salva no caminho:<br>'+esc(c.caminho)+'<br>Arquivos: '+c.arquivos.map(esc).join('; ')
+    :'○ Formulário com valores e contrato ainda não salvos no servidor';
+  const mk=(k)=>(PROC[k].e==='enviado'?'✓ ':'○ ')+esc(envioTxt(k));
+  return `<div class="pd-section"><div class="pd-section-title">Informativo do processo</div><div class="pd-grid cols1">`
+    +N('Pasta no servidor + documentos',r1)+N('Pasta 2 — 5.FORMULARIO_CONTRATO',r2)
+    +N('E-mail ao financeiro',mk('email'))+N('Mensagem de checklist ao cliente (WhatsApp)',mk('zap'))
+    +`</div></div>`;
+}
+/* ── RELATÓRIO SEM VALORES: apaga valores financeiros que apareçam em textos livres (observações, perfil, metas…) ── */
+let _semValor=false;
+function redigeValores(t){
+  if(!t)return t;
+  const M='[valor omitido]';
+  return String(t)
+    .replace(/R\$\s*\d(?:[\d.,]*\d)?(?:\s*(?:mil|milh(?:ão|ões|ao|oes))\b)?/gi,M)
+    .replace(/\b\d(?:[\d.,]*\d)?\s*(?:mil\s+)?(?:reais|real|contos?)\b/gi,M)
+    .replace(/\b\d{1,3}(?:\.\d{3})+,\d{2}\b(?!\s*%)/g,M)
+    .replace(/\b\d+,\d{2}\b(?!\s*%)/g,M)
+    .replace(/\b(honor[aá]rios?|mensalidades?|valor(?:es)?|descontos?|parcelas?|fee|pr[oó][- ]?labore|propostas?|taxas?)\b([^\d\n.;<>]{0,25}?)(\d[\d.]*)\b(?!\s*[%\/:\-])/gi,(m,a,b,n)=>n.replace(/\D/g,'').length>=3?a+b+M:m);
 }
 
 function reset(){
@@ -2452,7 +2534,7 @@ function reset(){
   setStatus('cnpjStatus','','');_seqP++;
   document.getElementById('inclBaixadas').checked=false;setStatus('buscaFilStatus','','');
   delete q('#sbx').dataset.src;
-  ckReset();
+  ckReset();procReset();
   document.getElementById('zapPreview').style.display='none';document.getElementById('zapAlerta').style.display='none';
   const ar=document.getElementById('ataRes');ar.style.display='none';ar.innerHTML='';
   fi.value='';go('upload',q('[data-s=upload]'));
