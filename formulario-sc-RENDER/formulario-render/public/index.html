@@ -659,11 +659,10 @@ input.auto,select.auto,textarea.auto{background:var(--green-bg);border-color:var
       <div id="emailPreview" style="display:none;margin-top:8px">
         <div style="font-size:12px;line-height:1.7"><b>Para:</b> <span id="emPara"></span><br><b>Cc:</b> <span id="emCc"></span><br><b>Assunto:</b> <input type="text" id="emAssunto" style="width:100%"></div>
         <div class="cnpj-status err" id="emailAlerta" style="display:none;margin-top:8px;font-weight:700"></div>
-        <div id="emailAvisoVermelho" style="display:none;margin-top:8px"><div style="font-size:11.5px;color:var(--text-s);margin-bottom:3px">Como o texto sai ao copiar / enviar no G-Click (negrito nos itens; aviso de nova constituição em vermelho). No Gmail aberto por link o texto vai sem formatação.</div><div id="emailRichPreview" style="border:1px solid var(--border-m);border-radius:8px;padding:10px 12px;background:#fff;font-size:13px;line-height:1.5;max-height:340px;overflow:auto"></div></div>
+        <div id="emailAvisoVermelho" style="display:none;margin-top:8px"><div style="font-size:11.5px;color:var(--text-s);margin-bottom:3px">Como o texto sai ao copiar / enviar no G-Click (itens numerados e aviso de nova constituição em negrito).</div><div id="emailRichPreview" style="border:1px solid var(--border-m);border-radius:8px;padding:10px 12px;background:#fff;font-size:13px;line-height:1.5;max-height:340px;overflow:auto"></div></div>
         <textarea id="emCorpo" rows="22" style="width:100%;margin-top:6px;font-family:inherit;font-size:13px" oninput="atualizaEstadoEmail()"></textarea>
         <div class="pasta-row">
           <button class="btn btn-navy btn-sm" id="btnEmGclick" onclick="enviarGclick()">Enviar no processo do G-Click</button>
-          <button class="btn btn-sm" id="btnEmGmail" onclick="abrirEmail('gmail')">Abrir no Gmail</button>
           <button class="btn btn-sm" id="btnEmCopiar" onclick="copiarEmail()">Copiar e-mail</button>
           <button class="btn btn-sm" id="btnEmConfirma" onclick="confirmarEnvio('email')">✔ Confirmar que enviei</button>
         </div>
@@ -2270,18 +2269,25 @@ function textoHonorario(){
   return l.join(' | ');
 }
 const AVISO_CONSTITUICAO='ATENÇÃO — NOVA CONSTITUIÇÃO: favor agendar a certificação digital com o cliente, para que o mesmo seja feito com urgência.';
-// Copia o e-mail como texto formatado (HTML + texto puro): a frase da nova constituição sai em vermelho ao colar em editor que aceite formatação.
+// Copia o e-mail como texto formatado (HTML + texto puro): itens e aviso da nova constituição saem em negrito ao colar em editor que aceite formatação.
 function emailHtml(texto){
   const e=x=>String(x).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
   return '<div style="font-family:Calibri,Arial,sans-serif;font-size:11pt">'+String(texto).split('\n').map(l=>{
-    if(l.indexOf(AVISO_CONSTITUICAO)>=0)return '<b style="color:#d00000">'+e(l)+'</b>';
+    if(l.indexOf(AVISO_CONSTITUICAO)>=0)return '<b>'+e(l)+'</b>';
     const m=/^(\d{1,2}\.\s[^:]{1,60}:)(.*)$/.exec(l);   // "11. Tipo de Serviço:" em negrito, o conteúdo normal
     return m?'<b>'+e(m[1])+'</b>'+e(m[2]):e(l);}).join('<br>')+'</div>';
 }
-function copiaRicoEmail(texto){
-  try{
-    const d=document.createElement('div');d.contentEditable='true';d.innerHTML=emailHtml(texto);
-    d.style.cssText='position:fixed;left:-9999px;top:0;white-space:pre-wrap';document.body.appendChild(d);
+async function copiaRicoEmail(texto){
+  const html=emailHtml(texto);
+  try{   // caminho limpo: HTML sem estilos da página + texto puro
+    if(navigator.clipboard&&window.ClipboardItem){
+      await navigator.clipboard.write([new ClipboardItem({'text/html':new Blob([html],{type:'text/html'}),'text/plain':new Blob([texto],{type:'text/plain'})})]);
+      return true;
+    }
+  }catch(e){}
+  try{    // alternativa para navegadores sem ClipboardItem
+    const d=document.createElement('div');d.contentEditable='true';d.innerHTML=html;
+    d.style.cssText='position:fixed;left:-9999px;top:0;white-space:pre-wrap;color:#000;background:#fff';document.body.appendChild(d);
     const r=document.createRange();r.selectNodeContents(d);const sel=window.getSelection();sel.removeAllRanges();sel.addRange(r);
     const ok=document.execCommand('copy');sel.removeAllRanges();d.remove();return ok;
   }catch(e){return false;}
@@ -2335,7 +2341,7 @@ function faltamNoEmail(){
 function atualizaEstadoEmail(){
   atualizaAvisoVermelho();
   const f=faltamNoEmail(),al=document.getElementById('emailAlerta'),st=document.getElementById('emailStatus');
-  ['btnEmGclick','btnEmGmail','btnEmCopiar'].forEach(id=>{const b=document.getElementById(id);b.classList.toggle('btn-bloq',f.length>0);b.setAttribute('aria-disabled',f.length>0?'true':'false');b.title=f.length?'Preencha todos os itens para liberar':'';});
+  ['btnEmGclick','btnEmCopiar'].forEach(id=>{const b=document.getElementById(id);b.classList.toggle('btn-bloq',f.length>0);b.setAttribute('aria-disabled',f.length>0?'true':'false');b.title=f.length?'Preencha todos os itens para liberar':'';});
   if(f.length){al.textContent='⚠️ E-mail incompleto — não pode ser copiado nem enviado. Falta preencher: '+f.join(', ')+'.';al.style.display='block';st.textContent='';st.className='cnpj-status';}
   else{al.style.display='none';st.textContent='✓ E-mail pronto. Confira o texto e clique em uma das opções para enviar.';st.className='cnpj-status ok';}
   return f;
@@ -2345,31 +2351,20 @@ function emailPronto(){   // bloqueia copiar/abrir enquanto faltar informação
   if(f.length){window.alert('ATENÇÃO: o e-mail está incompleto e não pode ser copiado nem enviado.\n\nFalta preencher:\n• '+f.join('\n• ')+'\n\nComplete na ficha (e gere o e-mail de novo) ou edite o texto.');return false;}
   return true;
 }
-function linkEmail(tipo){
-  const assunto=document.getElementById('emAssunto').value,corpo=document.getElementById('emCorpo').value,e=encodeURIComponent;
-  if(tipo==='gmail')return'https://mail.google.com/mail/?view=cm&fs=1&to='+e(EMAIL_PARA)+'&cc='+e(EMAIL_CC.join(','))+'&su='+e(assunto)+'&body='+e(corpo);
-  return'mailto:'+EMAIL_PARA+'?cc='+e(EMAIL_CC.join(','))+'&subject='+e(assunto)+'&body='+e(corpo).replace(/%0A/g,'%0D%0A');
-}
-function abrirEmail(tipo){
-  if(!document.getElementById('emCorpo').value){gerarEmailFinanceiro();}
-  if(!emailPronto())return;
-  const url=linkEmail(tipo);
-  procEnvio('email','aberto');
-  if(tipo==='gmail')window.open(url,'_blank','noopener');else window.location.href=url;
-}
 const GCLICK_URL='https://appp.gclick.com.br/dashboard';
 // O G-Click não aceita dados vindos de outro site: copia o texto do e-mail e abre o G-Click para colar no processo.
-function enviarGclick(){
+async function enviarGclick(){
   if(!emailPronto())return;
   const texto=document.getElementById('emCorpo').value,st=document.getElementById('emailStatus');
-  let copiado=copiaRicoEmail(texto);
+  const pc=copiaRicoEmail(texto);   // a cópia começa já no clique; a aba do G-Click abre em seguida
+  window.open(GCLICK_URL,'_blank','noopener');
+  procEnvio('email','aberto');
+  let copiado=await pc;
   if(!copiado)try{
     const ta=document.createElement('textarea');ta.value=texto;ta.style.cssText='position:fixed;left:-9999px;top:0';document.body.appendChild(ta);ta.select();
     copiado=document.execCommand('copy');ta.remove();
   }catch(e){}
-  if(!copiado&&navigator.clipboard)navigator.clipboard.writeText(texto).then(()=>{copiado=true;},()=>{});
-  window.open(GCLICK_URL,'_blank','noopener');
-  procEnvio('email','aberto');
+  if(!copiado&&navigator.clipboard)try{await navigator.clipboard.writeText(texto);copiado=true;}catch(e){}
   st.textContent=copiado?'✓ Texto do e-mail copiado e G-Click aberto em outra aba. Abra o processo e cole (Ctrl+V).':'G-Click aberto, mas não foi possível copiar sozinho: volte aqui e use “Copiar e-mail”.';
   st.className='cnpj-status '+(copiado?'ok':'warn');
   toast(copiado?'Texto copiado — cole no processo do G-Click':'Use “Copiar e-mail”');
@@ -2377,7 +2372,7 @@ function enviarGclick(){
 async function copiarEmail(){
   if(!emailPronto())return;
   const t='Para: '+EMAIL_PARA+'\nCc: '+EMAIL_CC.join('; ')+'\nAssunto: '+document.getElementById('emAssunto').value+'\n\n'+document.getElementById('emCorpo').value;
-  if(copiaRicoEmail(t)){toast('E-mail copiado (ainda não enviado)');procEnvio('email','copiado');return;}
+  if(await copiaRicoEmail(t)){toast('E-mail copiado (ainda não enviado)');procEnvio('email','copiado');return;}
   try{await navigator.clipboard.writeText(t);toast('E-mail copiado (ainda não enviado)');}catch(e){const ta=document.getElementById('emCorpo');ta.select();document.execCommand('copy');toast('Texto copiado (ainda não enviado)');}
   procEnvio('email','copiado');
 }
@@ -2492,7 +2487,7 @@ function agora(){const d=new Date();return d.toLocaleDateString('pt-BR')+' '+d.t
 function caminhoRecepcao(){return (g('pastaCaminho').trim()||CAMINHO_RECEPCAO_PADRAO).replace(/[\\\/]+$/,'');}
 const ENV_ORD={nao:0,copiado:1,aberto:2,enviado:3};
 const ENV_TXT={
-  email:{nao:'Não enviado',copiado:'Texto copiado — ainda NÃO enviado',aberto:'Aberto no G-Click/Gmail — envio ainda não confirmado',enviado:'Enviado ao financeiro'},
+  email:{nao:'Não enviado',copiado:'Texto copiado — ainda NÃO enviado',aberto:'Aberto no G-Click — envio ainda não confirmado',enviado:'Enviado ao financeiro'},
   zap:{nao:'Não enviada',copiado:'Mensagem apenas copiada — ainda NÃO enviada',aberto:'Aberta no WhatsApp — envio ainda não confirmado',enviado:'Enviada ao cliente pelo WhatsApp'}};
 function envioTxt(k){const s=PROC[k];return ENV_TXT[k][s.e]+(s.q?' ('+(s.e==='enviado'?'confirmado em ':'')+s.q+')':'');}
 function procEnvio(k,e){   // só avança: nao → copiado → aberto → enviado (copiar depois de abrir não "desfaz" nada)
